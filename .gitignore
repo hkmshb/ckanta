@@ -5,6 +5,7 @@ dist/
 venv/
 .tmp/
 
+.pytest_cache/
 
 *.py[cdo]
 *.log
