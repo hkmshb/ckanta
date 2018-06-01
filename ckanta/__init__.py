@@ -3,6 +3,7 @@ __version__ = '0.1.0'
 
 import os
 import sys
+import json
 import requests
 from tabulate import tabulate
 from urllib.parse import urljoin
@@ -38,31 +39,53 @@ class TableDef(namedtuple('TableDef', ['columns', 'headers'])):
 
 
 class CommandBase(Command):
+    _API_URL_SUBPATH = '/api/3/action/'
 
     def __init__(self, automator, name=None):
         super(CommandBase, self).__init__(name)
         self.automator = automator
 
-    def _api_get(self, rel_urlpath):
+    def _build_url(self, action):
+        conf = self.automator._conf
+        return urljoin(conf.urlbase + self._API_URL_SUBPATH, action)
+
+    def _api_get(self, action):
         '''Perform an API get request.
 
-        :param rel_urlpath: the relative url path for the API endpoint.
+        :param action: the relative url path for the API endpoint.
         '''
         conf = self.automator._conf
-        urlpath = urljoin(conf.urlbase + '/api/3/action/', rel_urlpath)
+        urlpath = self._build_url(action)
         headers = {'Authorization': conf.apikey}
         resp = requests.get(urlpath, headers=headers)
         resp.raise_for_status()
         result = resp.json()
         return result
 
+    def _api_post(self, action, payload=None):
+        '''Perform an API post request.
+
+        :param action: the relative url path for the API endpoint.
+        :param payload: payload to include in the request.
+        '''
+        conf = self.automator._conf
+        urlpath = self._build_url(action)
+        headers = {
+            'Authorization': conf.apikey, 
+            'Content-Type': 'application/json; charset=utf8'
+        }
+        resp = requests.post(urlpath, headers=headers, data=json.dumps(payload))
+        resp.raise_for_status()
+        result = resp.json()
+        return result
+
 
 class UserCommand(CommandBase):
-    """Manage users on CKAN
+    '''Manage users on CKAN
 
     user
-        {--l|list : If set, list all active users}
-    """
+        {--l|list : If set, list all users}
+    '''
     _DEFAULT_TDEF = TableDef('id:name:fullname:state:sysadmin'.split(':'))
 
     def handle(self):
@@ -81,6 +104,32 @@ class UserCommand(CommandBase):
                 self.line('No records found')
 
 
+class UserMembershipCommand(CommandBase):
+    '''Manages Organization and Group membership for a CKAN user.
+
+    user:membership
+        {userid : id or username for a registered CKAN user}
+        {--g|group : id or name for a group on the CKAN portal}
+        {--o|org : id or name for an organization on the CKAN portal}
+    '''
+    _DEFAULT_TDEF = TableDef('id:title:state'.split(':'))
+
+    def handle(self):
+        userid = self.argument('userid')
+        group = self.option('group')
+        org = self.option('org')
+        if not (group and org):
+            action_name = 'organization_list_for_user'
+            result = self._api_post(action_name, payload={"id": userid})
+            if result['success']:
+                info = self._DEFAULT_TDEF.extract_data(result['result'])
+                if info.values:
+                    self.line(tabulate(info.values, info.headers))
+                    self.line('\ndone')
+                else:
+                    self.line('No records found')
+
+
 class Automator(Application):
     ENVVAR_PREFIX = 'CKANTA_'
 
@@ -92,6 +141,7 @@ class Automator(Application):
     def __init__(self):
         super(Automator, self).__init__()
         self.add(UserCommand(self))
+        self.add(UserMembershipCommand(self))
 
     @classmethod
     def init(cls):
