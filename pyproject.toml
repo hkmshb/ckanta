@@ -9,6 +9,7 @@ license = "MIT"
 python = "^3.6"
 cleo = "^0.6.6"
 requests = "^2.18"
+tabulate = "^0.8.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^3.6"
