@@ -1,0 +1,12 @@
+__pycache__/
+*.egg-info/
+build/
+dist/
+venv/
+.tmp/
+
+
+*.py[cdo]
+*.log
+*.env
+tags
