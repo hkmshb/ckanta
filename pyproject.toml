@@ -3,9 +3,13 @@ name = "ckanta"
 version = "0.1.0"
 description = "Command-line tool for automating CKAN portal management tasks"
 authors = ["Abdul-Hakeem Shaibu <hkmshb@gmail.com>"]
+license = "MIT"
 
 [tool.poetry.dependencies]
-python = "3.6"
+python = "^3.6"
+cleo = "^0.6.6"
+requests = "^2.18"
 
 [tool.poetry.dev-dependencies]
-pytest = "^3.5"
+pytest = "^3.6"
+pytest-cov = "^2.5"
