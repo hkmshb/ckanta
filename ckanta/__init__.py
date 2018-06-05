@@ -106,9 +106,9 @@ class UserCommand(CommandBase):
 
 
 class UserMembershipCommand(CommandBase):
-    '''Manages Organization and Group membership for a CKAN user.
+    '''Manages the Organization and Group membership for a CKAN user.
 
-    user:membership
+    membership
         {userid : id or username for a registered CKAN user}
         {--a|add : If set, adds user as a member of provided group}
         {--r|role=? (choice): one of 'member', 'editor' or 'admin'}
