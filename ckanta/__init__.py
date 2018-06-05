@@ -13,7 +13,13 @@ from cleo.validators import Choice
 
 
 
-ActionDef = namedtuple('ActionDef', ['name', 'action', 'table_def'])
+class ActionDef(namedtuple('ActionDef', ['name', 'table_def'])):
+
+    def __new__(cls, name, table_def=None):
+        if table_def and isinstance(table_def, str):
+            table_def = TableDef(table_def.split(':'))
+        return cls.__new__(name, table_def)
+
 
 class ActionDefList(MutableSequence):
 
@@ -48,9 +54,9 @@ class ActionDefList(MutableSequence):
         if not isinstance(item, ActionDef):
             if not isinstance(item, (list, tuple)):
                 raise ValueError('List item expected to be an ActionDef '
-                    'item or tuple of strings and TableDef items')
-            if len(item) != 3 or not isinstance(item[2], TableDef):
-                raise ValueError('Tuple item expected to contain strings '
+                    'item or tuple of string and TableDef items')
+            if len(item) != 2 or not isinstance(item[1], TableDef):
+                raise ValueError('Tuple item expected to contain string '
                     'and TableDef items in that order')
             item = ActionDef(*item)
         return item
@@ -80,6 +86,20 @@ class TableDef(namedtuple('TableDef', ['columns', 'headers'])):
             row = [data[c] for c in self.columns]
             table.append(row)
         return self.__Info(self.headers, table)
+
+
+Actions = ActionDefList(
+    ActionDef('user_list', TableDef([
+        'id', 'name', 'fullname', 'state', 'sysadmin'])),
+    ActionDef('group_list', TableDef([
+        'id', 'name', 'title', 'state', 'package_count'])),
+    ActionDef('organization_list', TableDef([
+        'id', 'name', 'title', 'state', 'package_count'])),
+    ActionDef('package_list', TableDef(['id',])),
+    ActionDef('organization_list_for_user', TableDef([
+        'id', 'title', 'state'])),
+    ActionDef('organization_member_create'),
+)
 
 
 class CommandBase(Command):
@@ -130,12 +150,13 @@ class ShowCommand(CommandBase):
     show
         {--o|object= (choice) : one of 'user', 'group', 'organization' or 'dataset' }
     '''
-    _ACTIONS = ActionDefList(
-        ('user', 'user_list', TableDef('id:name:fullname:state:sysadmin'.split(':'))),
-        ('group', 'group_list', TableDef(('id:name:title:state:package_count'.split(':')))),
-        ('organization', 'organization_list', TableDef(('id',))),
-        ('dataset', 'package_list', TableDef(('id',)))
-    )
+    _ACTIONS = {
+        'user': Actions.get('user_list'),
+        'group': Actions.get('group_list'),
+        'organization': Actions.get('organization_list'),
+        'dataset': Actions.get('package_list')
+    }
+
     validation = {
         '--object': Choice(['dataset', 'group', 'organization', 'user'])
     }
@@ -172,10 +193,11 @@ class UserMembershipCommand(CommandBase):
         {--r|role=? (choice) : one of 'member', 'editor' or 'admin'}
         {--g|groups=* : id or name for an organization or on the CKAN portal}
     '''
-    _ACTION_LIST = 'organization_list_for_user'
-    _ACTION_CREATE = 'organization_member_create'
-    _DEFAULT_TDEF = TableDef('id:title:state'.split(':'))
     _DEFAULT_ROLE = 'member'
+    _ACTIONS = {
+        'list': Actions.get('organization_list_for_user'),
+        'create': Actions.get('organization_member_create')
+    }
 
     validation = {
         '--role': Choice([None, 'member', 'editor', 'admin'])
@@ -185,10 +207,10 @@ class UserMembershipCommand(CommandBase):
         userid = self.argument('userid')
         add_member = self.option('add')
         if not add_member:
-            action_name = self._ACTION_LIST
-            result = self._api_post(action_name, payload={"id": userid})
+            action = self._ACTIONS['list']
+            result = self._api_post(action.name, payload={"id": userid})
             if result['success']:
-                info = self._DEFAULT_TDEF.extract_data(result['result'])
+                info = action.table_def.extract_data(result['result'])
                 if info.values:
                     self.line(tabulate(info.values, info.headers))
                     self.line('\ndone')
@@ -198,14 +220,14 @@ class UserMembershipCommand(CommandBase):
             self.create_member(userid)
 
     def create_member(self, userid):
-        action_name = self._ACTION_CREATE
+        action = self._ACTIONS['create']
         groups = self.option('groups')  or []
         role = self.option('role') or self._DEFAULT_ROLE
 
         for g in groups:
             data = {'id': g, 'username': userid, 'role': role}
             try:
-                result = self._api_post(action_name, payload=data)
+                result = self._api_post(action.name, payload=data)
                 if result['success']:
                     self.line('{}: +'.format(g))
             except Exception as ex:
