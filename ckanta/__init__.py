@@ -7,10 +7,53 @@ import json
 import requests
 from tabulate import tabulate
 from urllib.parse import urljoin
-from collections import OrderedDict, namedtuple
+from collections import OrderedDict, namedtuple, MutableSequence
 from cleo import Application, Command
 from cleo.validators import Choice
 
+
+
+ActionDef = namedtuple('ActionDef', ['name', 'action', 'table_def'])
+
+class ActionDefList(MutableSequence):
+
+    def __init__(self, *items):
+        # validate items
+        items = [self.validate_item(i) for i in items]
+        self._innerlist = items
+
+    def __delitem__(self, pos):
+        del self._innerlist[pos]
+
+    def __getitem__(self, pos):
+        return self._innerlist[pos]
+
+    def __setitem__(self, pos, item):
+        item = self.validate_item(item)
+        self._innerlist[pos] = item
+
+    def __len__(self):
+        return len(self._innerlist)
+
+    def insert(self, pos, value):
+        print((pos, value))
+
+    def get(self, name):
+        for item in self:
+            if item.name == name:
+                return item
+        return None
+
+    def validate_item(self, item):
+        if not isinstance(item, ActionDef):
+            if not isinstance(item, (list, tuple)):
+                raise ValueError('List item expected to be an ActionDef '
+                    'item or tuple of strings and TableDef items')
+            if len(item) != 3 or not isinstance(item[2], TableDef):
+                raise ValueError('Tuple item expected to contain strings '
+                    'and TableDef items in that order')
+            item = ActionDef(*item)
+        return item
 
 
 class TableDef(namedtuple('TableDef', ['columns', 'headers'])):
@@ -81,23 +124,38 @@ class CommandBase(Command):
         return result
 
 
-class UserCommand(CommandBase):
-    '''Manage users on CKAN
+class ShowCommand(CommandBase):
+    '''Displays a listing of the major objects within CKAN
 
-    user
-        {--l|list : If set, list all users}
+    show
+        {--o|object= (choice) : one of 'user', 'group', 'organization' or 'dataset' }
     '''
-    _DEFAULT_TDEF = TableDef('id:name:fullname:state:sysadmin'.split(':'))
+    _ACTIONS = ActionDefList(
+        ('user', 'user_list', TableDef('id:name:fullname:state:sysadmin'.split(':'))),
+        ('group', 'group_list', TableDef(('id:name:title:state:package_count'.split(':')))),
+        ('organization', 'organization_list', TableDef(('id',))),
+        ('dataset', 'package_list', TableDef(('id',)))
+    )
+    validation = {
+        '--object': Choice(['dataset', 'group', 'organization', 'user'])
+    }
 
     def handle(self):
-        list_users = self.option('list')
-        if not list_users:
-            self.line('Tada!')
+        objectkey = self.option('object')
+        actiondef = self._ACTIONS.get(objectkey)
+        if objectkey in ('group', 'organization'):
+            data = {'all_fields': True}
+            result = self._api_post(actiondef.action, payload=data)
+        else:
+            result = self._api_get(actiondef.action)
+
+        if objectkey not in ('user', 'group'):
+            print(result)
             return
 
-        result = self._api_get('user_list')
         if result['success']:
-            info = self._DEFAULT_TDEF.extract_data(result['result'])
+            table_def = actiondef.table_def
+            info = table_def.extract_data(result['result'])
             if info.values:
                 self.line(tabulate(info.values, info.headers))
                 self.line('\ndone!')
@@ -111,7 +169,7 @@ class UserMembershipCommand(CommandBase):
     membership
         {userid : id or username for a registered CKAN user}
         {--a|add : If set, adds user as a member of provided group}
-        {--r|role=? (choice): one of 'member', 'editor' or 'admin'}
+        {--r|role=? (choice) : one of 'member', 'editor' or 'admin'}
         {--g|groups=* : id or name for an organization or on the CKAN portal}
     '''
     _ACTION_LIST = 'organization_list_for_user'
@@ -164,7 +222,7 @@ class Automator(Application):
 
     def __init__(self):
         super(Automator, self).__init__()
-        self.add(UserCommand(self))
+        self.add(ShowCommand(self))
         self.add(UserMembershipCommand(self))
 
     @classmethod
