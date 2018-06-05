@@ -9,6 +9,7 @@ from tabulate import tabulate
 from urllib.parse import urljoin
 from collections import OrderedDict, namedtuple
 from cleo import Application, Command
+from cleo.validators import Choice
 
 
 
@@ -109,17 +110,24 @@ class UserMembershipCommand(CommandBase):
 
     user:membership
         {userid : id or username for a registered CKAN user}
-        {--g|group : id or name for a group on the CKAN portal}
-        {--o|org : id or name for an organization on the CKAN portal}
+        {--a|add : If set, adds user as a member of provided group}
+        {--r|role=? (choice): one of 'member', 'editor' or 'admin'}
+        {--g|groups=* : id or name for an organization or on the CKAN portal}
     '''
+    _ACTION_LIST = 'organization_list_for_user'
+    _ACTION_CREATE = 'organization_member_create'
     _DEFAULT_TDEF = TableDef('id:title:state'.split(':'))
+    _DEFAULT_ROLE = 'member'
+
+    validation = {
+        '--role': Choice([None, 'member', 'editor', 'admin'])
+    }
 
     def handle(self):
         userid = self.argument('userid')
-        group = self.option('group')
-        org = self.option('org')
-        if not (group and org):
-            action_name = 'organization_list_for_user'
+        add_member = self.option('add')
+        if not add_member:
+            action_name = self._ACTION_LIST
             result = self._api_post(action_name, payload={"id": userid})
             if result['success']:
                 info = self._DEFAULT_TDEF.extract_data(result['result'])
@@ -128,6 +136,22 @@ class UserMembershipCommand(CommandBase):
                     self.line('\ndone')
                 else:
                     self.line('No records found')
+        else:
+            self.create_member(userid)
+
+    def create_member(self, userid):
+        action_name = self._ACTION_CREATE
+        groups = self.option('groups')  or []
+        role = self.option('role') or self._DEFAULT_ROLE
+
+        for g in groups:
+            data = {'id': g, 'username': userid, 'role': role}
+            try:
+                result = self._api_post(action_name, payload=data)
+                if result['success']:
+                    self.line('{}: +'.format(g))
+            except Exception as ex:
+                self.line('{}: x -{}'.format(g, str(ex)))
 
 
 class Automator(Application):
