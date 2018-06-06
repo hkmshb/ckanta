@@ -18,7 +18,7 @@ class ActionDef(namedtuple('ActionDef', ['name', 'table_def'])):
     def __new__(cls, name, table_def=None):
         if table_def and isinstance(table_def, str):
             table_def = TableDef(table_def.split(':'))
-        return cls.__new__(name, table_def)
+        return super().__new__(cls, name, table_def)
 
 
 class ActionDefList(MutableSequence):
@@ -166,9 +166,9 @@ class ShowCommand(CommandBase):
         actiondef = self._ACTIONS.get(objectkey)
         if objectkey in ('group', 'organization'):
             data = {'all_fields': True}
-            result = self._api_post(actiondef.action, payload=data)
+            result = self._api_post(actiondef.name, payload=data)
         else:
-            result = self._api_get(actiondef.action)
+            result = self._api_get(actiondef.name)
 
         if objectkey not in ('user', 'group'):
             print(result)
