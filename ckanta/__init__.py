@@ -98,6 +98,9 @@ Actions = ActionDefList(
     ActionDef('package_list', TableDef(['id',])),
     ActionDef('organization_list_for_user', TableDef([
         'id', 'title', 'state'])),
+    ActionDef('group_list_authz', TableDef([
+        'id', 'title', 'state'])),
+    ActionDef('group_member_create'),
     ActionDef('organization_member_create'),
 )
 
@@ -191,12 +194,15 @@ class UserMembershipCommand(CommandBase):
         {userid : id or username for a registered CKAN user}
         {--a|add : If set, adds user as a member of provided group}
         {--r|role=? (choice) : one of 'member', 'editor' or 'admin'}
-        {--g|groups=* : id or name for an organization or on the CKAN portal}
+        {--g|groups=* : id or name for an groupson the CKAN portal}
+        {--o|orgs=* : id or name for an organization on the CKAN portal}
     '''
     _DEFAULT_ROLE = 'member'
     _ACTIONS = {
-        'list': Actions.get('organization_list_for_user'),
-        'create': Actions.get('organization_member_create')
+        'list_groups': Actions.get('group_list_authz'),
+        'list_orgs': Actions.get('organization_list_for_user'),
+        'create_group_member': Actions.get('group_member_create'),
+        'create_org_member': Actions.get('organization_member_create'),
     }
 
     validation = {
@@ -207,31 +213,50 @@ class UserMembershipCommand(CommandBase):
         userid = self.argument('userid')
         add_member = self.option('add')
         if not add_member:
-            action = self._ACTIONS['list']
+            # list organizations user belongs to
+            action = self._ACTIONS['list_orgs']
             result = self._api_post(action.name, payload={"id": userid})
             if result['success']:
                 info = action.table_def.extract_data(result['result'])
                 if info.values:
+                    self.line('User Organizations')
                     self.line(tabulate(info.values, info.headers))
-                    self.line('\ndone')
                 else:
-                    self.line('No records found')
+                    self.line('No organization records found')
+
+            # list groups user can edit
+            action = self._ACTIONS['list_groups']
+            result = self._api_post(action.name, payload={})
+            if result['success']:
+                info = action.table_def.extract_data(result['result'])
+                if info.values:
+                    self.line('\nUser Groups')
+                    self.line(tabulate(info.values, info.headers))
+                else:
+                    self.line('No group records found')
         else:
             self.create_member(userid)
 
     def create_member(self, userid):
-        action = self._ACTIONS['create']
-        groups = self.option('groups')  or []
         role = self.option('role') or self._DEFAULT_ROLE
+        groups = self.option('groups') or []
+        orgs = self.option('orgs') or []
 
-        for g in groups:
-            data = {'id': g, 'username': userid, 'role': role}
-            try:
-                result = self._api_post(action.name, payload=data)
-                if result['success']:
-                    self.line('{}: +'.format(g))
-            except Exception as ex:
-                self.line('{}: x -{}'.format(g, str(ex)))
+        for label, action, items in (
+            ('Organizations', self._ACTIONS['create_org_member'], orgs), 
+            ('Groups', self._ACTIONS['create_group_member'], groups)
+        ):
+            if items:
+                self.line('\n>> Add {} to {}'.format(userid, label))
+
+            for item in items:
+                data = {'id': item, 'username': userid, 'role': role}
+                try:
+                    result = self._api_post(action.name, payload=data)
+                    if result['success']:
+                        self.line('{}: +'.format(item))
+                except Exception as ex:
+                    self.line('{}: x -{}'.format(item, str(ex)))
 
 
 class Automator(Application):
