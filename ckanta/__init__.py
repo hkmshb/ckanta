@@ -102,6 +102,9 @@ Actions = ActionDefList(
         'id', 'title', 'state'])),
     ActionDef('group_member_create'),
     ActionDef('organization_member_create'),
+    ActionDef('package_show', TableDef([
+        'id', 'title', 'groups'])),
+    ActionDef('member_create')
 )
 
 
@@ -151,13 +154,14 @@ class ShowCommand(CommandBase):
     '''Displays a listing of the major objects within CKAN
 
     show
-        {--o|object= (choice) : one of 'user', 'group', 'organization' or 'dataset' }
+        {--o|object= (choice) : one of 'user', 'group', 'organization' or 'dataset'}
     '''
     _ACTIONS = {
         'user': Actions.get('user_list'),
         'group': Actions.get('group_list'),
         'organization': Actions.get('organization_list'),
-        'dataset': Actions.get('package_list')
+        'dataset': Actions.get('package_list'),
+        'dataset_show': Actions.get('package_show')
     }
 
     validation = {
@@ -174,7 +178,10 @@ class ShowCommand(CommandBase):
             result = self._api_get(actiondef.name)
 
         if objectkey not in ('user', 'group'):
-            print(result)
+            if objectkey != 'dataset':
+                print(result)
+            else:
+                self._expand_dataset_list(result['result'])
             return
 
         if result['success']:
@@ -186,6 +193,32 @@ class ShowCommand(CommandBase):
             else:
                 self.line('No records found')
 
+    def _expand_dataset_list(self, ids):
+        def expand_row(source_row):
+            if not source_row[-1]:
+                return [source_row]
+
+            fmt = lambda r: "[{}, {}]".format(r['id'], r['name'])
+            table = [[source_row[0], source_row[1], fmt(source_row[-1][0])]]
+            for g in source_row[-1][1:]:
+                row = ['', '', fmt(g)]
+                table.append(row)
+            return table
+
+        rows = []
+        for id in ids:
+            action = self._ACTIONS['dataset_show']
+            result = self._api_post(action.name, payload={"id": id})
+            info = action.table_def.extract_data([result['result']])
+            if info.values:
+                row = info.values[0][:]
+                row_exp = expand_row(row)
+                rows.extend(row_exp)
+            if len(rows) == 5:
+                self.line(tabulate(rows, info.headers))
+                rows = []
+        self.line(tabulate(rows, info.headers))
+
 
 class UserMembershipCommand(CommandBase):
     '''Manages the Organization and Group membership for a CKAN user.
@@ -194,7 +227,7 @@ class UserMembershipCommand(CommandBase):
         {userid : id or username for a registered CKAN user}
         {--a|add : If set, adds user as a member of provided group}
         {--r|role=? (choice) : one of 'member', 'editor' or 'admin'}
-        {--g|groups=* : id or name for an groupson the CKAN portal}
+        {--g|groups=* : id or name for an groups on the CKAN portal}
         {--o|orgs=* : id or name for an organization on the CKAN portal}
     '''
     _DEFAULT_ROLE = 'member'
@@ -259,6 +292,66 @@ class UserMembershipCommand(CommandBase):
                     self.line('{}: x -{}'.format(item, str(ex)))
 
 
+class DatasetMembershipCommand(CommandBase):
+    '''Manages the Group membership for a CKAN dataset.
+
+    dataset:membership
+        {--f|file= : file containing mapping of datasets to groups}
+        {--d|data=* : 'datasetid groupid'; adds dataset to specified group}
+    '''
+    _DEFAULT_CAPACITY = 'member'
+    _ACTIONS = {
+        'create': Actions.get('member_create')
+    }
+
+    def handle(self):
+        data = self.option('data') or []
+        fpath = self.option('file') or None
+        if data and fpath:
+            self.line("Options -f/--file and -d/--data are mutually exclusive\n")
+            return
+        elif not (data or fpath):
+            self.line("Options -f/--file or -d/--data required\n")
+            return
+
+        # collect data args
+        if data:
+            data_args = self._process_args(data)
+        elif fpath:
+            if not os.path.exists(fpath):
+                print('error : File not found: {}'.format(fpath))
+                return
+
+            with open(fpath, 'r') as fp:
+                data_args = self._process_args(fp.readlines())
+
+        # make api calls
+        self.line('\n>> Adding datasets to groups...')
+        try:
+            action = self._ACTIONS['create']
+            for datasetid, groupid in data_args:
+                data_dict = {
+                    'id': groupid, 'object': datasetid,
+                    'object_type': 'package',
+                    'capacity': 'member'
+                }
+                result = self._api_post(action.name, payload=data_dict)
+                if result['success']:
+                    self.line('{}: +'.format(datasetid))
+        except Exception as ex:
+            self.line('{}: x - {}'.format(datasetid, str(ex)))
+
+    def _process_args(self, lines):
+        for line in lines:
+            line = line.strip()
+            if line.endswith('#'):
+                continue
+            elif line.endswith('[]'):
+                raise StopIteration()
+            parts = [ln.strip() for ln in line.split('  ') if ln.strip()][-2:]
+            yield parts
+
+
 class Automator(Application):
     ENVVAR_PREFIX = 'CKANTA_'
 
@@ -271,6 +364,7 @@ class Automator(Application):
         super(Automator, self).__init__()
         self.add(ShowCommand(self))
         self.add(UserMembershipCommand(self))
+        self.add(DatasetMembershipCommand(self))
 
     @classmethod
     def init(cls):
