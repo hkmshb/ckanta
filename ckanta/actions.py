@@ -103,10 +103,10 @@ class OrganizationCommand:
     '''Command for handling Organization data on a CKAN data portal.
     '''
 
-    def __init__(self, api_client, org_type='organization'):
-        assert org_type in ('organization', 'group')
+    def __init__(self, api_client, is_group=False):
+        self.org_type = 'group' if is_group else 'organization'
         self._api_client = api_client
-        self.org_type = org_type
+        self.is_group = is_group
 
     def list(self, simple, page_no=1, page_size=5, offset=0):
         '''Returns a list of Organizations witihin a CKAN data portal.
@@ -191,18 +191,23 @@ def organization():
 
 @organization.command(name='list')
 @click.option('-s', '--simple', is_flag=True, default=False)
+@click.option('--is_group', is_flag=True, default=False)
 @click.option('-n', '--page_no', type=int, default=1)
 @click.option('-n', '--page_size', type=int, default=5)
 @click.option('-o', '--offset', type=int, default=0)
-def organization_list(simple, page_no, page_size, offset):
+def organization_list(simple, is_group, page_no, page_size, offset):
     api_client = ApiClient.from_conf()
-    orgcmd = OrganizationCommand(api_client)
+    orgcmd = OrganizationCommand(api_client, is_group)
     try:
         result = orgcmd.list(simple, page_no, page_size, offset)
     except Exception as ex:
         _log.error("error: %s", ex)
         return
-    return persist_csv(result)
+
+    if simple:
+        print(result)
+    else:
+        persist_csv(result)
 
 
 def persist_csv(result, filename='output-%04d.csv'):
@@ -223,26 +228,37 @@ def persist_csv(result, filename='output-%04d.csv'):
 
 @organization.command(name='upload')
 @click.argument('input', type=click.File('r'))
-def organization_upload(input):
+@click.option('--is_group', is_flag=True, default=False)
+def organization_upload(input, is_group):
+    # *** groups ***
+    # display_name,description,image_display_url,package_count,created,name,is_organization,
+    # state,extras,image_url,type,title,revision_id,num_followers,id,approval_status
+
     api_client = ApiClient.from_conf()
-    orgcmd = OrganizationCommand(api_client)
+    orgcmd = OrganizationCommand(api_client, is_group)
 
     extra_fields = ['code', 'slogan', 'website_url']
-    # exclude_fields = ['image_display_url', 'package_count', 'num_followers']
-    target_fields = ['name', 'id', 'title', 'description', 'state', 'approval_status']
+    exclude_fields = [
+        'image_display_url', 'package_count', 'created', 'image_url', 
+         'revision_id', 'num_followers', 'extras'
+    ]
 
     # read csv file
     reader = csv.DictReader(input, delimiter=',')
     for row in reader:
         # build data dict
-        data_dict = {field: row[field] for field in target_fields}
-        data_dict['extras'] = [
-            {'key': field, 'value': row[field]}
-                for field in extra_fields
-        ]
+        data_dict = {field: row[field] 
+            for field in row.keys()
+            if field not in exclude_fields
+        }
+        if not orgcmd.is_group:
+            data_dict['extras'] = [
+                {'key': field, 'value': row[field]}
+                    for field in extra_fields
+            ]
 
         try:
-            result = orgcmd.create(data_dict)
+            print(orgcmd.create(data_dict))
             _log.info("org created: %s", data_dict['name'])
         except Exception as ex:
             _log.error("error: %s", ex)
