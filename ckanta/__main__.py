@@ -1,9 +1,13 @@
 from ckanta import Automator
 
 
-
-if __name__ == '__main__':
+def main():
     Automator.init()
 
     auto = Automator()
     auto.run()
+
+
+
+if __name__ == '__main__':
+    main()
