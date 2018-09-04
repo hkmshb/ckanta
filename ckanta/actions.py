@@ -154,6 +154,11 @@ class OrganizationCommand:
         result = self._api_client.post(action, payload)
         return {'data': [result['result']]}
 
+    def create(self, data_dict):
+        action = '{}_create'.format(self.org_type)
+        result = self._api_client.post(action, data_dict)
+        return result
+
 
 class OrganizationDownloader:
     '''Command for downloading Organizations from a CKAN data portal.
@@ -214,3 +219,31 @@ def persist_csv(result, filename='output-%04d.csv'):
 
         fp.flush()
     click.echo('Done!')
+
+
+@organization.command(name='upload')
+@click.argument('input', type=click.File('r'))
+def organization_upload(input):
+    api_client = ApiClient.from_conf()
+    orgcmd = OrganizationCommand(api_client)
+
+    extra_fields = ['code', 'slogan', 'website_url']
+    # exclude_fields = ['image_display_url', 'package_count', 'num_followers']
+    target_fields = ['name', 'id', 'title', 'description', 'state', 'approval_status']
+
+    # read csv file
+    reader = csv.DictReader(input, delimiter=',')
+    for row in reader:
+        # build data dict
+        data_dict = {field: row[field] for field in target_fields}
+        data_dict['extras'] = [
+            {'key': field, 'value': row[field]}
+                for field in extra_fields
+        ]
+
+        try:
+            result = orgcmd.create(data_dict)
+            _log.info("org created: %s", data_dict['name'])
+        except Exception as ex:
+            _log.error("error: %s", ex)
+            _log.info("info: unable to create org: %s", data_dict['name'])
