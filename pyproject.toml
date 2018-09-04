@@ -17,5 +17,5 @@ pytest = "^3.6"
 pytest-cov = "^2.5"
 
 [tool.poetry.scripts]
-ckanta = "ckanta:main"
+ckanta = "ckanta.__main__:main"
 ckanta-ext = "ckanta.actions:ckanta"
