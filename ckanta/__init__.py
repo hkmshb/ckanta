@@ -90,7 +90,7 @@ class TableDef(namedtuple('TableDef', ['columns', 'headers'])):
 
 Actions = ActionDefList(
     ActionDef('user_list', TableDef([
-        'id', 'name', 'fullname', 'state', 'sysadmin'])),
+        'id', 'name', 'fullname', 'email', 'state', 'sysadmin'])),
     ActionDef('group_list', TableDef([
         'id', 'name', 'title', 'state', 'package_count'])),
     ActionDef('organization_list', TableDef([
