@@ -1,4 +1,7 @@
 pipeline:
+  clone:
+    image: plugins/git
+    url: http://host.docker.internal:8071/hkmshb/ckanta.git
   ckanta:
     image: python:3.6.6-alpine3.8
     commands:
