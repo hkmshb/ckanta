@@ -5,3 +5,5 @@ pipeline:
       - py.test
     when:
       branch: develop
+    networks:
+      - dockernet
