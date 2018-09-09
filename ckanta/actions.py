@@ -1,5 +1,6 @@
 import csv
 import os
+import ast
 import sys
 import json
 import logging
@@ -160,22 +161,38 @@ class OrganizationCommand:
         return result
 
 
-class OrganizationDownloader:
-    '''Command for downloading Organizations from a CKAN data portal.
-    '''
+class DatasetCommand:
 
-    def __init__(self, outputfile, type='organization'):
-        '''
-        :param type: one of group, organization
-        '''
-        assert type in ('group', 'organization')
-        self.outputfile = outputfile
-        self.type = type
+    def __init__(self, api_client):
+        self._api_client = api_client
 
-    def list(self, apicl):
-        action = '{}_list'.format(self.type)
-        data_dict = {'all_fields': False}
-        result = apicl.post(action, payload=data_dict)
+    def list(self):
+        action = 'package_list'
+        result = self._api_client.post(action, {})
+        return {
+            'data': result['result']
+        }
+
+    def show(self, id):
+        action = 'package_show'
+        result = self._api_client.post(action, {'id': id})
+
+        # exclude resources
+        exclude_fields = [
+            'resources', 'num_resources', 'num_tags', 'revision_id',
+            'license_url'
+            ]
+        for field in exclude_fields:
+            # error free way to delete/drop entries
+            result['result'].pop(field, None)
+
+        return {
+            'data': [result['result']]
+        }
+
+    def create(self, data_dict):
+        action = 'package_create'
+        result = self._api_client.post(action, data_dict)
         return result
 
 
@@ -258,8 +275,101 @@ def organization_upload(input, is_group):
             ]
 
         try:
-            print(orgcmd.create(data_dict))
+            orgcmd.create(data_dict)
             _log.info("org created: %s", data_dict['name'])
         except Exception as ex:
             _log.error("error: %s", ex)
             _log.info("info: unable to create org: %s", data_dict['name'])
+
+
+@ckanta.group()
+def dataset():
+    pass
+
+
+@dataset.command(name='list')
+def dataset_list():
+    api_client = ApiClient.from_conf()
+    cmd = DatasetCommand(api_client)
+    print(cmd.list())
+
+
+@dataset.command(name='dump')
+@click.option('--limit', type=int, default=5)
+@click.option('--offset', type=int, default=0)
+@click.option('--output', type=click.Path(), default='datasets-%04d.csv')
+def dataset_dump(limit, offset, output):
+    api_client = ApiClient.from_conf()
+    cmd = DatasetCommand(api_client)
+
+    # retrieve dataset list
+    try:
+        result = cmd.list()
+    except Exception as ex:
+        _log.error("error: %s", ex)
+        return
+
+    sorted_names = sorted(result['data'])
+    if not sorted_names:
+        _log.info('No datasets found')
+        return
+
+    sorted_names = sorted_names[offset : offset + limit]
+    result_list = list(map(lambda n: cmd.show(n), sorted_names))
+    result = {'data': result_list}
+    persist_csv(result, output)
+
+
+@dataset.command(name='show')
+def dataset_show():
+    api_client = ApiClient.from_conf()
+    cmd = DatasetCommand(api_client)
+    print(cmd.show('abia-administrative-boundaries'))
+
+
+@dataset.command(name='upload')
+@click.argument('input', type=click.File('r'))
+def dataset_upload(input):
+    # *** groups ***
+    # display_name,description,image_display_url,package_count,created,name,is_organization,
+    # state,extras,image_url,type,title,revision_id,num_followers,id,approval_status
+
+    api_client = ApiClient.from_conf()
+    cmd = DatasetCommand(api_client)
+
+    extra_fields = []
+
+    # read csv file
+    reader = csv.DictReader(input, delimiter=',')
+    for row in reader:
+        # build data dict
+        data_dict = {field: row[field] 
+            for field in row.keys()
+            if field not in extra_fields
+        }
+
+        data_dict['extras'] = [
+            {'key': field, 'value': row[field]}
+                for field in extra_fields
+        ]
+
+        # process python dict, sequence that got converted to string
+        for field in (
+            'groups', 'tags', 'relationships_as_object', 'relationships_as_subject'
+        ):
+            value = data_dict.pop(field, None)
+            if value:
+                value = ast.literal_eval(value)
+                data_dict[field] = value
+
+        try:
+            data_dict['sector_id'] = data_dict['groups'][0]['id']
+            print('*' * 20)
+            print(data_dict)
+            print('*' * 20)
+            cmd.create(data_dict)
+            _log.info("dataset created: %s", data_dict['name'])
+        except Exception as ex:
+            _log.info("info: unable to create org: %s", data_dict['name'])
+            _log.error("error: %s", ex)
+            raise

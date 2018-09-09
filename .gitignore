@@ -11,3 +11,5 @@ venv/
 *.env.*
 *.log
 tags
+
+.DS_Store
