@@ -9,5 +9,7 @@ pipeline:
       - python -c "import os; print(os); print(os.getcwd());"
       - ls /opt/ckanta/bin
       - cat /opt/ckanta/bin/activate
+      - apk add bash
+      - bash --version
     when:
       branch: develop
