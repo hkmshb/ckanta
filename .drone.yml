@@ -3,9 +3,9 @@ pipeline:
     image: python:3.6.6-alpine3.8
     commands:
       - python -m venv /opt/ckanta
-      - /opt/ckanta/bin/pip install poetry
-      - /opt/ckanta/bin/poetry install
-      - ls /opt/ckanta/bin
-      - /opt/ckanta/bin/py.test /drone/src/gitea.local.io/hkmshb/ckanta
+      - /bin/ash /opt/ckanta/bin/activate
+      - cd /drone/src/gitea.local.io/hkmshb/ckanta
+      - poetry develop
+      - py.test
     when:
       branch: develop
