@@ -5,5 +5,6 @@ pipeline:
       - python -m venv /opt/ckanta
       - /opt/ckanta/bin/pip install poetry
       - /opt/ckanta/bin/poetry install
+      - py.test
     when:
       branch: develop
