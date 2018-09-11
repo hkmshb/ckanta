@@ -7,5 +7,7 @@ pipeline:
       - source /opt/ckanta/bin/activate
       - cd /drone/src/gitea.local.io/hkmshb/ckanta
       - python -c "import os; print(os); print(os.getcwd());"
+      - ls /opt/ckanta/bin
+      - cat /opt/ckanta/bin/activate
     when:
       branch: develop
