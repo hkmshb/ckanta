@@ -2,14 +2,12 @@ pipeline:
   ckanta:
     image: python:3.6.6-alpine3.8
     commands:
-      - pip install poetry
+      - apk add bash && pip install poetry
       - python -m venv /opt/ckanta
       - source /opt/ckanta/bin/activate
       - cd /drone/src/gitea.local.io/hkmshb/ckanta
       - python -c "import os; print(os); print(os.getcwd());"
-      - ls /opt/ckanta/bin
-      - cat /opt/ckanta/bin/activate
-      - apk add bash
-      - bash --version
+      - poetry develop
+      - py.test
     when:
       branch: develop
