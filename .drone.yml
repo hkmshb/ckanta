@@ -5,6 +5,7 @@ pipeline:
       - python -m venv /opt/ckanta
       - /bin/ash /opt/ckanta/bin/activate
       - cd /drone/src/gitea.local.io/hkmshb/ckanta
+      - pip install poetry
       - poetry develop
       - py.test
     when:
