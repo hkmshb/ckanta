@@ -2,10 +2,10 @@ pipeline:
   ckanta:
     image: python:3.6.6-alpine3.8
     commands:
+      - pip install poetry
       - python -m venv /opt/ckanta
       - /bin/ash /opt/ckanta/bin/activate
       - cd /drone/src/gitea.local.io/hkmshb/ckanta
-      - pip install poetry
       - poetry develop
       - py.test
     when:
