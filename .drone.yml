@@ -4,9 +4,8 @@ pipeline:
     commands:
       - pip install poetry
       - python -m venv /opt/ckanta
-      - /bin/ash /opt/ckanta/bin/activate
+      - sh /opt/ckanta/bin/activate
       - cd /drone/src/gitea.local.io/hkmshb/ckanta
-      - poetry develop
-      - py.test
+      - python -c "import os; print(os)"
     when:
       branch: develop
