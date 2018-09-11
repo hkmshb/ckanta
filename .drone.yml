@@ -6,8 +6,8 @@ pipeline:
       - python -m venv /opt/ckanta
       - source /opt/ckanta/bin/activate
       - cd /drone/src/gitea.local.io/hkmshb/ckanta
-      - python -c "import os; print(os); print(os.getcwd());"
       - poetry develop
+      - ls /opt/ckanta/bin
       - py.test
     when:
       branch: develop
