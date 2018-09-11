@@ -5,6 +5,7 @@ pipeline:
       - python -m venv /opt/ckanta
       - /opt/ckanta/bin/pip install poetry
       - /opt/ckanta/bin/poetry install
-      - /opt/ckanta/bin/py.test /drone/src/hkmshb/ckanta
+      - ls /opt/ckanta/bin
+      - /opt/ckanta/bin/py.test /drone/src/gitea.local.io/hkmshb/ckanta
     when:
       branch: develop
