@@ -2,6 +2,8 @@ pipeline:
   ckanta:
     image: python:3.6.6-alpine3.8
     commands:
-      - py.test
+      - python -m venv /opt/ckanta
+      - /opt/ckanta/bin/pip install poetry
+      - /opt/ckanta/bin/poetry install
     when:
       branch: develop
