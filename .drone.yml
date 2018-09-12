@@ -5,7 +5,8 @@ pipeline:
       - apk add bash && pip install poetry
       - python -m venv /opt/ckanta
       - source /opt/ckanta/bin/activate
-      - cd /drone/src/gitea.local.io/hkmshb/ckanta
+      - echo ${DRONE_REPO}
+      - cd /drone/src/${DRONE_REMOTE_URL}/hkmshb/ckanta
       - poetry develop
       - ls /opt/ckanta/bin
       - py.test
