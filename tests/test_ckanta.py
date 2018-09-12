@@ -10,3 +10,9 @@ def test_actiondef():
     action = ActionDef('action')
     assert action is not None
     assert action.table_def is None
+
+
+def test_actiondef_with_title():
+    action = ActionDef('action', 'title')
+    assert action is not None
+    assert action.table_def is not None
