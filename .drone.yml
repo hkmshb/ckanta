@@ -6,6 +6,8 @@ pipeline:
       - python -m venv /opt/ckanta
       - source /opt/ckanta/bin/activate
       - echo ${DRONE_REPO}
+      - echo ${DRONE_REPO_LINK}
+      - ls /drone/src/host.docker.internal/hkmshb/ckanta
       - cd /drone/src/${DRONE_REMOTE_URL}/hkmshb/ckanta
       - poetry develop
       - ls /opt/ckanta/bin
