@@ -35,9 +35,10 @@ def _load_config(instance_name):
 @click.option('-u', '--urlbase')
 @click.option('-k', '--apikey')
 @click.option('-i', '--instance', default='local')
+@click.option('--post', default=False, is_flag=True)
 @click.option('--debug', default=False, is_flag=True)
 @click.pass_context
-def ckanta(ctx, urlbase, apikey, instance, debug):
+def ckanta(ctx, urlbase, apikey, instance, post, debug):
     class CKANTAContext: 
         pass
 
@@ -60,6 +61,7 @@ def ckanta(ctx, urlbase, apikey, instance, debug):
     context = CKANTAContext()
     context.client = client
     context.debug = debug
+    context.as_get = not post
     ctx.obj = context
 
 
@@ -128,7 +130,7 @@ def list(context, object, option):
 
     try:
         cmd = ListCommand(context.client, object=object, **option_dict)
-        result = cmd.execute()
+        result = cmd.execute(as_get=context.as_get)
         pprint(result['result'])
     except CommandError as ex:
         _log.error('error: {}'.format(ex))

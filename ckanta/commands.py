@@ -14,7 +14,7 @@ class CommandError(CKANTAError):
 class ListCommand:
     '''Retrieve and list objects from a CKAN instance.
     '''
-    TARGET_OBJECTS = ('group', 'organization')
+    TARGET_OBJECTS = ('dataset', 'group', 'organization', 'user')
 
     def __init__(self, api_client, **action_args):
         self._validate_cli_args(action_args)
@@ -25,10 +25,16 @@ class ListCommand:
         '''Validate that cli args provided for the `list` command are valid.
         '''
         assert 'object' in args, 'Target object to be listed required'
-        assert args.get('object', None) in self.TARGET_OBJECTS, (
+
+        target_object = args.get('object', None)
+        assert target_object in self.TARGET_OBJECTS, (
             'Invalid target object. Any of these expected: {}'.format(
                 self.TARGET_OBJECTS
             ))
+
+        # normalize object name; dataset in particular
+        if target_object == 'dataset':
+            args['object'] = 'package'
 
     def _build_group_payload(self):
         payload = {
@@ -46,7 +52,19 @@ class ListCommand:
         payload.update(self.action_args)
         return payload
 
-    def execute(self):
+    def _build_package_payload(self):
+        payload = {}
+        payload.update(self.action_args)
+        return payload
+
+    def _build_user_payload(self):
+        payload = {
+            'all_fields': False
+        }
+        payload.update(self.action_args)
+        return payload
+
+    def execute(self, as_get=True):
         target_object = self.action_args.pop('object')
         action_name = '{}_list'.format(target_object)
 
@@ -60,7 +78,7 @@ class ListCommand:
             action_name, payload
         ))
         try:
-            result = self.api_client(action_name, payload)
+            result = self.api_client(action_name, payload, as_get=as_get)
         except Exception as ex:
             raise CommandError('API request failed.') from ex
 
