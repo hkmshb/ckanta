@@ -7,7 +7,7 @@ import logging
 from pprint import pprint
 from ckanta.common import read_config, get_config_instance, \
      ConfigError, ApiClient, Config
-from ckanta.commands import CommandError, ListCommand
+from ckanta.commands import CommandError, ListCommand, ShowCommand
 
 
 _log = logging.getLogger(__name__)
@@ -133,9 +133,30 @@ def list(context, object, option):
         result = cmd.execute(as_get=context.as_get)
         pprint(result['result'])
     except CommandError as ex:
-        _log.error('error: {}'.format(ex))
-        raise ex
+        func = _log.error if not context.debug else _log.exception
+        func('error: {}'.format(ex))
 
+
+@ckanta.command()
+@click.argument('object', click.Choice(ShowCommand.TARGET_OBJECTS))
+@click.argument('id', type=str)
+@click.option('-o', '--option', multiple=True)
+@click.pass_obj
+def show(context, object, id, option):
+    # option -> List; item format: key=value
+    option_dict = dict(map(
+        lambda opt: (x.strip() for x in opt.split('=')),
+        option
+    ))
+    _log.debug('parsed options: {}'.format(option_dict))
+
+    try:
+        cmd = ShowCommand(context.client, object=object, id=id, **option_dict)
+        result = cmd.execute(as_get=context.as_get)
+        pprint(result['result'])
+    except CommandError as ex:
+        func = _log.error if not context.debug else _log.exception
+        func('error: {}'.format(ex))
 
 
 if __name__ == '__main__':
