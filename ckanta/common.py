@@ -41,7 +41,7 @@ def get_config_instance(configp, name='local'):
     '''Returns the configuration for the named instance.
     '''
     section_name = 'instance:{}'.format(name)
-    if section_name not in configp:
+    if section_name not in configp.sections():
         errmsg = 'Config section not found: {}'
         raise ConfigError(errmsg.format(section_name))
 
