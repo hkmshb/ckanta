@@ -4,18 +4,20 @@ import sys
 import enum
 import click
 import logging
+from pprint import pprint
 from ckanta.common import read_config, get_config_instance, \
      ConfigError, ApiClient, Config
+from ckanta.commands import CommandError, ListCommand
 
 
 _log = logging.getLogger(__name__)
-CONFIG_PATH = '~/.ckanta/config.ini-x'
+CONFIG_PATH = '~/.ckanta/config.ini'
 
 
 def _configure_logger_dev():
     '''Configures the default logger for development.
     '''
-    _log.setLevel(logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
 
 
 def _load_config(instance_name):
@@ -33,13 +35,16 @@ def _load_config(instance_name):
 @click.option('-u', '--urlbase')
 @click.option('-k', '--apikey')
 @click.option('-i', '--instance', default='local')
-@click.option('--debug-mode', default=False, is_flag=True)
+@click.option('--debug', default=False, is_flag=True)
 @click.pass_context
-def ckanta(ctx, urlbase, apikey, instance, debug_mode):
-    # mutually exclused: (urlbase, apikey) and instance
+def ckanta(ctx, urlbase, apikey, instance, debug):
     class CKANTAContext: 
         pass
 
+    if debug:
+        _configure_logger_dev()
+
+    # mutually exclused: (urlbase, apikey) and instance
     if urlbase is not None and apikey is not None:
         client = ApiClient(urlbase, apikey)
     else:
@@ -54,7 +59,7 @@ def ckanta(ctx, urlbase, apikey, instance, debug_mode):
     # monkey patching.. really?
     context = CKANTAContext()
     context.client = client
-    context.debug_mode = debug_mode
+    context.debug = debug
     ctx.obj = context
 
 
@@ -109,6 +114,27 @@ def config(context, name, list, show_key):
         _list_config_sections()
 
 
+@ckanta.command()
+@click.argument('object', click.Choice(ListCommand.TARGET_OBJECTS))
+@click.option('-o', '--option', multiple=True)
+@click.pass_obj
+def list(context, object, option):
+    # option -> List; item format: key=value
+    option_dict = dict(map(
+        lambda opt: (x.strip() for x in opt.split('=')),
+        option
+    ))
+    _log.debug('parsed options: {}'.format(option_dict))
+
+    try:
+        cmd = ListCommand(context.client, object=object, **option_dict)
+        result = cmd.execute()
+        pprint(result['result'])
+    except CommandError as ex:
+        _log.error('error: {}'.format(ex))
+        raise ex
+
+
+
 if __name__ == '__main__':
-    _configure_logger_dev()
     ckanta()
