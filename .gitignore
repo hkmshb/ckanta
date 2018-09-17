@@ -13,4 +13,5 @@ venv/
 tags
 
 .DS_Store
+.vscode
 .cache

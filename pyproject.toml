@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ckanta"
-version = "0.1.0"
+version = "0.2.0"
 description = "Command-line tool for automating CKAN portal management tasks"
 authors = ["Abdul-Hakeem Shaibu <hkmshb@gmail.com>"]
 license = "MIT"
@@ -18,4 +18,5 @@ pytest-cov = "^2.5"
 
 [tool.poetry.scripts]
 ckanta = "ckanta.__main__:main"
+ckanta-cli = "ckanta.cli:ckanta"
 ckanta-ext = "ckanta.actions:ckanta"
