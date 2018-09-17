@@ -8,6 +8,16 @@ HERE = fs.abspath(fs.dirname(__file__))
 
 class TestConfig:
 
+    def test_instantiation_without_name(self):
+        cfg = Config(urlbase='urlbase', apikey='apikey')
+        assert cfg is not None
+        assert cfg.name is None
+
+    def test_instantiation_with_name(self):
+        cfg = Config(name='name', urlbase='urlbase', apikey='apikey')
+        assert cfg is not None
+        assert cfg.name == 'name'
+
     def test_get_instance(self, cfg_s):
         config = get_config_instance(cfg_s, 'local')
         assert config is not None

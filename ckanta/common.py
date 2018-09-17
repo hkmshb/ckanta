@@ -1,3 +1,4 @@
+import requests
 import os.path as fs
 from pathlib import Path
 from collections import namedtuple
@@ -5,11 +6,50 @@ from configparser import ConfigParser
 
 
 
-class ConfigError(Exception):
+class CKANTAError(Exception):
+    '''Base exception for all exceptions defined in CKANTA.
+    '''
     pass
 
 
-Config = namedtuple('Config', ['urlbase', 'apikey'])
+class ConfigError(CKANTAError):
+    pass
+
+
+class Config(namedtuple('Config', ['urlbase', 'apikey', 'name'])):
+    '''Config object which optional can carry a name.
+    '''
+
+    def __new__(cls, urlbase, apikey, name=None):
+        return super().__new__(cls, urlbase, apikey, name)
+
+
+def read_config(fpath):
+    '''Reads the CKANTA configuration at the specified path.
+    '''
+    fpath = fs.expanduser(fpath)
+    fpath = fs.expandvars(fpath)
+
+    configp = ConfigParser()
+    if fpath not in configp.read(fpath):
+        errmsg = 'File not found: {}'.format(fpath)
+        raise ConfigError(errmsg)
+    return configp
+
+
+def get_config_instance(configp, name='local'):
+    '''Returns the configuration for the named instance.
+    '''
+    section_name = 'instance:{}'.format(name)
+    if section_name not in configp:
+        errmsg = 'Config section not found: {}'
+        raise ConfigError(errmsg.format(section_name))
+
+    section = configp[section_name]
+    values = list(map(
+        lambda k: section.get(k), ('urlbase', 'apikey')
+    ))
+    return Config(*values)
 
 
 class ApiClient:
@@ -60,31 +100,3 @@ class ApiClient:
     def __repr__(self):
         msgfmt = '<ApiClient (urlbase={}, apikey=***)>'
         return msgfmt.format(self.urlbase)
-
-
-def read_config(fpath):
-    '''Reads the CKANTA configuration at the specified path.
-    '''
-    fpath = fs.expanduser(fpath)
-    fpath = fs.expandvars(fpath)
-
-    configp = ConfigParser()
-    if fpath not in configp.read(fpath):
-        errmsg = 'File not found: {}'.format(fpath)
-        raise ConfigError(errmsg)
-    return configp
-
-
-def get_config_instance(configp, name='local'):
-    '''Returns the configuration for the named instance.
-    '''
-    section_name = 'instance:{}'.format(name)
-    if section_name not in configp:
-        errmsg = 'Config section not found: {}'
-        raise ConfigError(errmsg.format(section_name))
-
-    section = configp[section_name]
-    values = list(map(
-        lambda k: section.get(k), ('urlbase', 'apikey')
-    ))
-    return Config(*values)
