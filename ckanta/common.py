@@ -62,28 +62,28 @@ class ApiClient:
         return msgfmt.format(self.urlbase)
 
 
-def read(fpath):
+def read_config(fpath):
     '''Reads the CKANTA configuration at the specified path.
     '''
     fpath = fs.expanduser(fpath)
     fpath = fs.expandvars(fpath)
 
-    cfgp = ConfigParser()
-    if fpath not in cfgp.read(fpath):
+    configp = ConfigParser()
+    if fpath not in configp.read(fpath):
         errmsg = 'File not found: {}'.format(fpath)
         raise ConfigError(errmsg)
-    return cfgp
+    return configp
 
 
-def get_instance(cfgp, name='local'):
+def get_config_instance(configp, name='local'):
     '''Returns the configuration for the named instance.
     '''
     section_name = 'instance:{}'.format(name)
-    if section_name not in cfgp:
+    if section_name not in configp:
         errmsg = 'Config section not found: {}'
         raise ConfigError(errmsg.format(section_name))
 
-    section = cfgp[section_name]
+    section = configp[section_name]
     values = list(map(
         lambda k: section.get(k), ('urlbase', 'apikey')
     ))
