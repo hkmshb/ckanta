@@ -89,7 +89,7 @@ class ApiClient:
         if as_get:
             resp = requests.get(action_url, headers=headers)
         else:
-            assert data, "Payload required for making a POST request"
+            assert data is not None, "Payload required for making a POST request"
 
             headers['Content-Type'] = 'application/json; charset=utf8'
             resp = requests.post(action_url, headers=headers,
