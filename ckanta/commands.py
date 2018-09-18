@@ -115,3 +115,32 @@ class ShowCommand(CommandBase):
         except Exception as ex:
             raise CommandError('API request failed.') from ex
         return result
+
+
+class MembershipCommand(CommandBase):
+    COMMAND = '::list'
+    TARGET_OBJECTS = (COMMAND,)
+    TARGET_ACTIONS = ('organization_list_for_user', 'group_list_authz')
+
+    def __init__(self, api_client, userid, check_group=False):
+        super().__init__(api_client, object=self.COMMAND)
+        self.check_group = check_group
+        self.userid = userid
+
+    def execute(self, as_get):
+        payload = {'id': self.userid}
+        action_names = self.TARGET_ACTIONS
+        _log.debug('action_names: {}; payload: {}'.format(
+            action_names, payload)
+        )
+
+        results = []
+        targets = action_names[:1] if not self.check_group else action_names
+        try:
+            for action_name in targets:
+                title = action_name.split('_')[0]
+                result = self.api_client(action_name, payload, as_get)
+                results.append(result)
+        except Exception as ex:
+            raise CommandError('API request failed.') from ex
+        return results
