@@ -7,9 +7,9 @@ import logging
 from pprint import pprint
 from ckanta.common import read_config, get_instance_config, \
      get_config, log_error, ConfigError, ApiClient, Config, \
-     CKANTAContext
+     CKANTAContext, MembershipRole
 from ckanta.commands import CommandError, ListCommand, ShowCommand, \
-     MembershipCommand, UploadCommand
+     MembershipCommand, MembershipGrantCommand, UploadCommand
 
 
 _log = logging.getLogger(__name__)
@@ -108,7 +108,7 @@ def config(context, instance, list, show_key):
 
 
 @ckanta.command('list')
-@click.argument('object', click.Choice(ListCommand.TARGET_OBJECTS))
+@click.argument('object', type=click.Choice(ListCommand.TARGET_OBJECTS))
 @click.option('-o', '--option', multiple=True)
 @click.pass_obj
 def ckanta_list(context, object, option):
@@ -132,7 +132,7 @@ def ckanta_list(context, object, option):
 
 
 @ckanta.command()
-@click.argument('object', click.Choice(ShowCommand.TARGET_OBJECTS))
+@click.argument('object', type=click.Choice(ShowCommand.TARGET_OBJECTS))
 @click.argument('id', type=str)
 @click.option('-o', '--option', multiple=True)
 @click.pass_obj
@@ -160,8 +160,7 @@ def show(context, object, id, option):
 @ckanta.group()
 @click.pass_obj
 def membership(context):
-    '''Retrieve user membership across organizations and groups within a
-    CKAN instance.
+    '''Manage user membership across objects on a CKAN instance.
     '''
     pass
 
@@ -192,8 +191,29 @@ def membership_list(context, userid, check_groups):
     pprint(result)
 
 
+@membership.command('grant')
+@click.argument('userid', type=str)
+@click.argument('role', type=click.Choice(MembershipRole.names()))
+@click.option('-g', '--group', 'groups', multiple=True)
+@click.option('-o', '--org', 'orgs', multiple=True)
+@click.pass_obj
+def membership_grant(context, userid, role, groups, orgs):
+    '''Grants user access priviledge on a group, organization or dataset.
+    '''
+    for (objects, is_org) in ((groups, False), (orgs, True)):
+        if not objects:
+            continue
+
+        click.echo('Processing user membership for {}(s)...'.format(
+            'organization' if is_org else 'group'))
+
+        cmd = MembershipGrantCommand(context, userid, role, objects, is_org)
+        result = cmd.execute(as_get=False)
+        pprint(result)
+
+
 @ckanta.command()
-@click.argument('object', click.Choice(UploadCommand.TARGET_OBJECTS))
+@click.argument('object', type=click.Choice(UploadCommand.TARGET_OBJECTS))
 @click.argument('infile', type=click.File('r'))
 @click.option('--org', 'owner_orgs', multiple=True)
 @click.pass_obj

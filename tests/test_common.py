@@ -1,6 +1,7 @@
 import pytest
 import os.path as fs
-from ckanta.common import get_instance_config, Config, ConfigError, ApiClient
+from ckanta.common import get_instance_config, Config, ConfigError, \
+     ApiClient, MembershipRole
 
 
 HERE = fs.abspath(fs.dirname(__file__))
@@ -42,3 +43,22 @@ class TestApiClient:
         client = ApiClient('http://localhost', '*secret*')
         with pytest.raises(AssertionError):
             client('group_list', as_get=False)
+
+
+class TestMembershipRole:
+
+    def test_names_returns_roles_as_string(self):
+        expected = set(('none', 'member', 'editor', 'admin'))
+        assert set(MembershipRole.names()) == expected
+
+    @pytest.mark.parametrize('name, expected', [
+        ('none', MembershipRole.NONE), ('member', MembershipRole.MEMBER),
+        ('editor', MembershipRole.EDITOR), ('admin', MembershipRole.ADMIN)
+    ])
+    def test_creating_role_using_from_name(self, name, expected):
+        value = MembershipRole.from_name(name)
+        assert value == expected
+
+    def test_creating_role_from_invalid_name_fails(self):
+        with pytest.raises(ValueError):
+            MembershipRole.from_name('bad-name')

@@ -1,3 +1,4 @@
+import enum
 import json
 import requests
 import itertools
@@ -26,6 +27,24 @@ class Config(namedtuple('Config', ['urlbase', 'apikey', 'name'])):
 
     def __new__(cls, urlbase, apikey, name=None):
         return super().__new__(cls, urlbase, apikey, name)
+
+
+class MembershipRole(enum.Enum):
+    NONE = 0
+    MEMBER = 1
+    EDITOR = 2
+    ADMIN = 3
+
+    @classmethod
+    def names(cls):
+        return [n.name.lower() for n in cls]
+
+    @classmethod
+    def from_name(cls, name):
+        try:
+            return cls[name.strip().upper()]
+        except (KeyError, ValueError) as ex:
+            raise ValueError from ex
 
 
 def read_config(fpath):

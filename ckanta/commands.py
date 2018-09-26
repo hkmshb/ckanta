@@ -1,8 +1,9 @@
 import csv
+import click
 import logging
 from slugify import slugify
 from collections import OrderedDict, namedtuple
-from .common import CKANTAError
+from .common import CKANTAError, MembershipRole
 
 
 _log = logging.getLogger()
@@ -148,6 +149,50 @@ class MembershipCommand(CommandBase):
         except Exception as ex:
             raise CommandError('API request failed.') from ex
         return results
+
+
+class MembershipGrantCommand(CommandBase):
+    TARGET_OBJECTS = ('user',)
+
+    def __init__(self, context, userid, role, objects, is_org):
+        super().__init__(context, object='user')
+        self.role = MembershipRole.from_name(role)
+        self.objects = objects
+        self.userid = userid
+        self.is_org = is_org
+
+    def _create_membership(self, group):
+        if self.role == MembershipRole.NONE:
+            click.echo('Skipping operation as dropping membership (role=none) '
+                       'is not supported yet')
+            return
+
+        role_name = self.role.name.lower()
+        target_object = 'organization' if self.is_org else 'group'
+        action_name = '{}_member_create'.format(target_object)
+        payload = {
+            'id': group, 'username': self.userid, 
+            'role': role_name
+        }
+        self.api_client(action_name, data=payload, as_get=False)
+
+    def execute(self, as_get):
+        passed, action_result = (0, [])
+        for obj in self.objects:
+            try:
+                self._create_membership(obj)
+                action_result.append('+ {}'.format(obj))
+                passed += 1
+            except Exception as ex:
+                action_result.append('. {}: err: {}'.format(obj, ex))
+        
+        total = len(self.objects)
+        return {
+            'result': action_result,
+            'summary': {
+                'total': total, 'passed': passed, 'failed': total - passed
+            }
+        }
 
 
 class UploadCommand(CommandBase):
