@@ -60,6 +60,8 @@ def ckanta(ctx, urlbase, apikey, instance, post, debug):
 @click.option('--show-key', default=False, is_flag=True)
 @click.pass_obj
 def config(context, instance, list, show_key):
+    '''Explore configured settings for CKANTA.
+    '''
     client = context.client
 
     if list and instance != 'local':
@@ -110,6 +112,9 @@ def config(context, instance, list, show_key):
 @click.option('-o', '--option', multiple=True)
 @click.pass_obj
 def ckanta_list(context, object, option):
+    '''Retrieve a list of objects (dataset, group, organization, user) from
+    a CKAN instance.
+    '''
     # option -> List; item format: key=value
     option_dict = dict(map(
         lambda opt: (x.strip() for x in opt.split('=')),
@@ -132,6 +137,8 @@ def ckanta_list(context, object, option):
 @click.option('-o', '--option', multiple=True)
 @click.pass_obj
 def show(context, object, id, option):
+    '''Show an object (dataset, group, organization, user) in detail.
+    '''
     # option -> List; item format: key=value
     option_dict = dict(map(
         lambda opt: (x.strip() for x in opt.split('=')),
@@ -146,7 +153,8 @@ def show(context, object, id, option):
     except CommandError as ex:
         func = _log.error if not context.debug else _log.exception
         func('error: {}'.format(ex))
-    pprint(result['result'])
+        return
+    pprint(result)
 
 
 @ckanta.group()
@@ -190,6 +198,8 @@ def membership_list(context, userid, check_groups):
 @click.option('--org', 'owner_orgs', multiple=True)
 @click.pass_obj
 def upload(context, object, infile, owner_orgs):
+    '''Create objects (dataset) on a CKAN instance.
+    '''
     try:
         kwargs = {'object': object, 'infile': infile, 'owner_orgs': owner_orgs}
         cmd = UploadCommand(context, **kwargs)
@@ -197,7 +207,6 @@ def upload(context, object, infile, owner_orgs):
         pprint(result)
     except CommandError as ex:
         log_error(ex, context, _log)
-
 
 
 if __name__ == '__main__':
