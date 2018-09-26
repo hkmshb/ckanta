@@ -6,13 +6,13 @@ import click
 import logging
 from pprint import pprint
 from ckanta.common import read_config, get_config_instance, \
-     ConfigError, ApiClient, Config
+     get_config, log_error, ConfigError, ApiClient, Config
 from ckanta.commands import CommandError, ListCommand, ShowCommand, \
-     MembershipCommand
+     MembershipCommand, UploadCommand
 
 
 _log = logging.getLogger(__name__)
-CONFIG_PATH = '~/.ckanta/config.ini'
+CONFIG_PATH = '~/.config/ckanta.conf'
 
 
 def _configure_logger_dev():
@@ -41,7 +41,17 @@ def _load_config(instance_name):
 @click.pass_context
 def ckanta(ctx, urlbase, apikey, instance, post, debug):
     class CKANTAContext: 
-        pass
+        def __init__(self, client, as_get=False, debug=False):
+            self.client = client
+            self.as_get = as_get
+            self.debug = debug
+            self.__configp = read_config(CONFIG_PATH)
+
+        def get_config(self, name, section=None):
+            '''Retrieves config entry from the default section.
+            '''
+            return get_config(self.__configp, name, section)
+
 
     if debug:
         _configure_logger_dev()
@@ -58,11 +68,7 @@ def ckanta(ctx, urlbase, apikey, instance, post, debug):
         client = ApiClient(cfg.urlbase, cfg.apikey)
 
     # context to hold ckanta specific context
-    # monkey patching.. really?
-    context = CKANTAContext()
-    context.client = client
-    context.debug = debug
-    context.as_get = not post
+    context = CKANTAContext(client, not post, debug)
     ctx.obj = context
 
 
@@ -130,7 +136,7 @@ def list(context, object, option):
     _log.debug('parsed options: {}'.format(option_dict))
 
     try:
-        cmd = ListCommand(context.client, object=object, **option_dict)
+        cmd = ListCommand(context, object=object, **option_dict)
         result = cmd.execute(as_get=context.as_get)
         pprint(result['result'])
     except CommandError as ex:
@@ -153,12 +159,13 @@ def show(context, object, id, option):
     result = {}
 
     try:
-        cmd = ShowCommand(context.client, object=object, id=id, **option_dict)
+        cmd = ShowCommand(context, object=object, id=id, **option_dict)
         result = cmd.execute(as_get=context.as_get)
     except CommandError as ex:
         func = _log.error if not context.debug else _log.exception
         func('error: {}'.format(ex))
     pprint(result['result'])
+
 
 @ckanta.group()
 @click.pass_obj
@@ -186,13 +193,29 @@ def membership_list(context, userid, check_groups):
     '''
     result = {}
     try:
-        cmd = MembershipCommand(context.client, userid, check_groups)
+        cmd = MembershipCommand(context, userid, check_groups)
         result = cmd.execute(as_get=context.as_get)
     except CommandError as ex:
         func = _log.error if not context.debug else _log.exception
         func('error: {}'.format(ex))
         return
     pprint(result)
+
+
+@ckanta.command()
+@click.argument('object', click.Choice(UploadCommand.TARGET_OBJECTS))
+@click.argument('infile', type=click.File('r'))
+@click.option('--org', 'owner_orgs', multiple=True)
+@click.pass_obj
+def upload(context, object, infile, owner_orgs):
+    try:
+        kwargs = {'object': object, 'infile': infile, 'owner_orgs': owner_orgs}
+        cmd = UploadCommand(context, **kwargs)
+        result = cmd.execute(as_get=False)
+        pprint(result)
+    except CommandError as ex:
+        log_error(ex, context, _log)
+
 
 
 if __name__ == '__main__':

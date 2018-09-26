@@ -1,9 +1,9 @@
 __pycache__/
 *.egg-info/
+[._]tmp/
 build/
 dist/
 venv/
-.tmp/
 
 .pytest_cache/
 

@@ -171,6 +171,18 @@ pytest = ">=2.9"
 
 [[package]]
 category = "main"
+description = "A Python Slugify application that handles Unicode"
+name = "python-slugify"
+optional = false
+platform = "*"
+python-versions = "*"
+version = "1.2.6"
+
+[package.dependencies]
+Unidecode = ">=0.04.16"
+
+[[package]]
+category = "main"
 description = "Python HTTP for Humans."
 name = "requests"
 optional = false
@@ -204,6 +216,15 @@ version = "0.8.2"
 
 [[package]]
 category = "main"
+description = "ASCII transliterations of Unicode text"
+name = "unidecode"
+optional = false
+platform = "*"
+python-versions = "*"
+version = "1.0.22"
+
+[[package]]
+category = "main"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 name = "urllib3"
 optional = false
@@ -212,7 +233,7 @@ python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, <4"
 version = "1.23"
 
 [metadata]
-content-hash = "4c59c08b2d31ab8de34b2fa7b9e827813a72b9f3aea024d8b738b02008f824d6"
+content-hash = "a4d0592127d329bc30e1c9aefb72d2d7082b046f7a5e29b84274aea850d2500f"
 platform = "*"
 python-versions = "^3.6"
 
@@ -233,7 +254,9 @@ py = ["06a30435d058473046be836d3fc4f27167fd84c45b99704f2fb5509ef61f9af1", "50402
 pylev = ["063910098161199b81e453025653ec53556c1be7165a9b7c50be2f4d57eae1c3", "1d29a87beb45ebe1e821e7a3b10da2b6b2f4c79b43f482c2df1a1f748a6e114e"]
 pytest = ["2d7c49e931316cc7d1638a3e5f54f5d7b4e5225972b3c9838f3584788d27f349", "ad0c7db7b5d4081631e0155f5c61b80ad76ce148551aaafe3a718d65a7508b18"]
 pytest-cov = ["513c425e931a0344944f84ea47f3956be0e416d95acbd897a44970c8d926d5d7", "e360f048b7dae3f2f2a9a4d067b2dd6b6a015d384d1577c994a43f3f7cbad762"]
+python-slugify = ["7723daf30996db26573176bddcdf5fcb98f66dc70df05c9cb29f2c79b8193245"]
 requests = ["63b52e3c866428a224f97cab011de738c36aec0185aa91cfacd418b5d58911d1", "ec22d826a36ed72a7358ff3fe56cbd4ba69dd7a6718ffd450ff0e9df7a47ce6a"]
 six = ["70e8a77beed4562e7f14fe23a786b54f6296e34344c23bc42f07b15018ff98e9", "832dc0e10feb1aa2c68dcc57dbb658f1c7e65b9b61af69048abc87a2db00a0eb"]
 tabulate = ["e4ca13f26d0a6be2a2915428dc21e732f1e44dad7f76d7030b2ef1ec251cf7f2"]
+unidecode = ["72f49d3729f3d8f5799f710b97c1451c5163102e76d64d20e170aedbbd923582", "8c33dd588e0c9bc22a76eaa0c715a5434851f726131bd44a6c26471746efabf5"]
 urllib3 = ["a68ac5e15e76e7e5dd2b8f94007233e01effe3e50e8daddf69acfd81cb686baf", "b5725a0bd4ba422ab0e66e89e030c806576753ea3ee08554382c14e685d117b5"]

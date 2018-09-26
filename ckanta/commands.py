@@ -1,4 +1,8 @@
+import csv
 import logging
+import itertools
+from slugify import slugify
+from collections import OrderedDict, namedtuple
 from .common import CKANTAError
 
 
@@ -13,10 +17,11 @@ class CommandError(CKANTAError):
 
 class CommandBase:
 
-    def __init__(self, api_client, **action_args):
+    def __init__(self, context, **action_args):
         self._validate_action_args(action_args)
-        self.api_client = api_client
+        self.api_client = context.client
         self.action_args = action_args
+        self.context = context
 
     def _validate_action_args(self, args):
         '''Validates that action args provided on the cli are valid.
@@ -122,8 +127,8 @@ class MembershipCommand(CommandBase):
     TARGET_OBJECTS = (COMMAND,)
     TARGET_ACTIONS = ('organization_list_for_user', 'group_list_authz')
 
-    def __init__(self, api_client, userid, check_group=False):
-        super().__init__(api_client, object=self.COMMAND)
+    def __init__(self, context, userid, check_group=False):
+        super().__init__(context, object=self.COMMAND)
         self.check_group = check_group
         self.userid = userid
 
@@ -144,3 +149,114 @@ class MembershipCommand(CommandBase):
         except Exception as ex:
             raise CommandError('API request failed.') from ex
         return results
+
+
+class UploadCommand(CommandBase):
+    '''Creates an object on a CKAN instance.
+    '''
+    TARGET_OBJECTS = ('dataset',)
+
+    @property
+    def national_states(self):
+        key = '__national_states'
+        if not hasattr(self, key):
+            states = OrderedDict()
+            State = namedtuple('State', ['code', 'name'])
+
+            value = self.context.get_config('national-states')
+            for entry in itertools.chain(*[
+                ln.split('  ') for ln in value.split('\n') if ln
+            ]):
+                code, name = entry.strip().split(':')
+                name = name.replace("'", '').strip()
+                states[slugify(name)] = State(code, name)
+
+            setattr(self, key, states)
+        return getattr(self, key)
+
+    def _validate_action_args(self, args):
+        '''Validates that action args provided on the cli are valid.
+
+        Expects a file argument to be provided in addition to the object
+        argument.
+        '''
+        # checks that object argument is provide
+        super()._validate_action_args(args)
+
+        # check that file argument is provided
+        file_arg = args.get('infile', None)
+        assert file_arg is not None, "'infile' argument expected"
+
+    def _get_package_payload_factory(self, payload_method, file_obj):
+        reader = csv.DictReader(file_obj, delimiter=',')
+        owner_orgs = self.action_args.pop('owner_orgs', [])
+
+        for row in reader:
+            for orgname in owner_orgs:
+                row.setdefault('owner_org', orgname)
+                row.setdefault('locations', orgname)
+                yield payload_method(row, orgname)
+
+    def _build_package_payload(self, row_dict, orgname):
+        # required: name, private, state:active, type:dataset, owner_org,
+        #           sector_id, locations
+        row_dict.setdefault('type', 'dataset')
+        row_dict.setdefault('state', 'active')
+        row_dict.setdefault('private', 'false')
+        row_dict.setdefault('name', slugify(row_dict.get('title')))
+
+        # adjust title
+        if not orgname.startswith('national'):
+            title = row_dict.pop('title')
+            row_dict['title'] = '{} {}'.format(
+                self.national_states[orgname].name,
+                title
+            )
+
+        # use sector_id to define sector
+        sector_id = row_dict.get('sector_id', '')
+        row_dict['groups'] = [{'name': sector_id}]
+        return row_dict
+
+    def execute(self, as_get=True):
+        file_obj = self.action_args.pop('infile')
+        target_object = self.action_args.pop('object')
+        action_name = '{}_create'.format(target_object)
+
+        method_name = '_build_{}_payload'.format(target_object)
+        if not hasattr(self, method_name):
+            errmsg = 'Payload builder method not found: {}'
+            raise CommandError(errmsg.format(method_name))
+
+        payload_method = getattr(self, method_name)
+
+        method_name = '_get_{}_payload_factory'.format(target_object)
+        if not hasattr(self, method_name):
+            errmsg = 'Payload factory method not found: {}'
+            raise CommandError(errmsg.format(method_name))
+
+        factory_method = getattr(self, method_name)
+        _log.debug('action: {}, payload-method: {}, payload-factory: {}'.format(
+            action_name, payload_method.__name__, factory_method.__name__)
+        )
+
+        factory = factory_method(payload_method, file_obj)
+        passed, action_result = (0, [])
+        for payload in factory:
+            _log.debug('{} payload: {}'.format(target_object, payload))
+            try:
+                self.api_client(action_name, payload, as_get=False)
+                action_result.append('+ {}'.format(payload.get('name', '?')))
+                passed += 1
+            except Exception as ex:
+                _log.error('API request failed. {}'.format(ex))
+                action_result.append('x {}'.format(payload.get('name', '?')))
+
+        total_items = len(action_result)
+        return {
+            'result': action_result, 
+            'summary': {
+                'total': total_items, 'passed': passed,
+                'failed': total_items - passed
+            }
+        }
