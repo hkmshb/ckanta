@@ -154,6 +154,7 @@ class MembershipCommand(CommandBase):
 class UploadCommand(CommandBase):
     '''Creates an object on a CKAN instance.
     '''
+    NATIONAL_KEY = 'national:'
     TARGET_OBJECTS = ('dataset',)
 
     @property
@@ -191,27 +192,28 @@ class UploadCommand(CommandBase):
         reader = csv.DictReader(file_obj, delimiter=',')
         owner_orgs = self.action_args.pop('owner_orgs', [])
 
+        norm = lambda n: n.replace(self.NATIONAL_KEY, '')
         for row in reader:
             for orgname in owner_orgs:
-                row.setdefault('owner_org', orgname)
-                row.setdefault('locations', orgname)
+                row.setdefault('owner_org', norm(orgname))
+                row.setdefault('locations', norm(orgname))
                 yield payload_method(row, orgname)
 
     def _build_package_payload(self, row_dict, orgname):
         # required: name, private, state:active, type:dataset, owner_org,
         #           sector_id, locations
-        row_dict.setdefault('type', 'dataset')
-        row_dict.setdefault('state', 'active')
-        row_dict.setdefault('private', 'false')
-        row_dict.setdefault('name', slugify(row_dict.get('title')))
-
         # adjust title
-        if not orgname.startswith('national'):
+        if not orgname.startswith(self.NATIONAL_KEY):
             title = row_dict.pop('title')
             row_dict['title'] = '{} {}'.format(
                 self.national_states[orgname].name,
                 title
             )
+
+        row_dict.setdefault('type', 'dataset')
+        row_dict.setdefault('state', 'active')
+        row_dict.setdefault('private', 'false')
+        row_dict.setdefault('name', slugify(row_dict.get('title')))
 
         # use sector_id to define sector
         sector_id = row_dict.get('sector_id', '')
