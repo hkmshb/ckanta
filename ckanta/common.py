@@ -1,9 +1,12 @@
 import json
 import requests
+import itertools
 import os.path as fs
 from pathlib import Path
-from collections import namedtuple
 from configparser import ConfigParser
+from collections import namedtuple, OrderedDict
+
+from slugify import slugify
 
 
 
@@ -50,7 +53,7 @@ def get_config(configp, name, section_name=None):
     return section.get(name, None)
 
 
-def get_config_instance(configp, name='local'):
+def get_instance_config(configp, name='local'):
     '''Returns the configuration for the named instance.
     '''
     section_name = 'instance:{}'.format(name)
@@ -118,3 +121,36 @@ class ApiClient:
     def __repr__(self):
         msgfmt = '<ApiClient (urlbase={}, apikey=***)>'
         return msgfmt.format(self.urlbase)
+
+
+class CKANTAContext: 
+    NATIONAL_KEY = 'national:'
+
+    def __init__(self, configp, client, as_get=False, debug=False):
+        self.__configp = configp
+        self.client = client
+        self.as_get = as_get
+        self.debug = debug
+
+    @property
+    def national_states(self):
+        key = '__national_states'
+        if not hasattr(self, key):
+            states = OrderedDict()
+            State = namedtuple('State', ['code', 'name'])
+
+            value = self.get_config('national-states')
+            for entry in itertools.chain(*[
+                ln.split('  ') for ln in value.split('\n') if ln
+            ]):
+                code, name = entry.strip().split(':')
+                name = name.replace("'", '').strip()
+                states[slugify(name)] = State(code, name)
+
+            setattr(self, key, states)
+        return getattr(self, key)
+
+    def get_config(self, name, section=None):
+        '''Retrieves config entry from the default section.
+        '''
+        return get_config(self.__configp, name, section)

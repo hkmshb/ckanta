@@ -5,8 +5,9 @@ import enum
 import click
 import logging
 from pprint import pprint
-from ckanta.common import read_config, get_config_instance, \
-     get_config, log_error, ConfigError, ApiClient, Config
+from ckanta.common import read_config, get_instance_config, \
+     get_config, log_error, ConfigError, ApiClient, Config, \
+     CKANTAContext
 from ckanta.commands import CommandError, ListCommand, ShowCommand, \
      MembershipCommand, UploadCommand
 
@@ -21,17 +22,6 @@ def _configure_logger_dev():
     logging.basicConfig(level=logging.DEBUG)
 
 
-def _load_config(instance_name):
-    try:
-        configp = read_config(CONFIG_PATH)
-        cfg = get_config_instance(configp, instance_name)
-    except ConfigError as ex:
-        _log.info('Config file path: {}'.format(CONFIG_PATH))
-        click.echo('error: {}'.format(ex))
-        raise
-    return cfg
-
-
 @click.group()
 @click.option('-u', '--urlbase')
 @click.option('-k', '--apikey')
@@ -40,35 +30,27 @@ def _load_config(instance_name):
 @click.option('-d', '--debug', default=False, is_flag=True)
 @click.pass_context
 def ckanta(ctx, urlbase, apikey, instance, post, debug):
-    class CKANTAContext: 
-        def __init__(self, client, as_get=False, debug=False):
-            self.client = client
-            self.as_get = as_get
-            self.debug = debug
-            self.__configp = read_config(CONFIG_PATH)
-
-        def get_config(self, name, section=None):
-            '''Retrieves config entry from the default section.
-            '''
-            return get_config(self.__configp, name, section)
-
-
     if debug:
         _configure_logger_dev()
+
+    try:
+        configp = read_config(CONFIG_PATH)
+    except ConfigError as ex:
+        _log.info('Config file not found: {}'.format(CONFIG_PATH))
 
     # mutually exclused: (urlbase, apikey) and instance
     if urlbase is not None and apikey is not None:
         client = ApiClient(urlbase, apikey)
     else:
         try:
-            cfg = _load_config(instance)
+            cfg = get_instance_config(configp, instance)
         except ConfigError as ex:
             click.echo('Try providing the config parameters directly instead.\n')
             sys.exit()
         client = ApiClient(cfg.urlbase, cfg.apikey)
 
     # context to hold ckanta specific context
-    context = CKANTAContext(client, not post, debug)
+    context = CKANTAContext(configp, client, not post, debug)
     ctx.obj = context
 
 
@@ -123,11 +105,11 @@ def config(context, instance, list, show_key):
         _list_config_sections()
 
 
-@ckanta.command()
+@ckanta.command('list')
 @click.argument('object', click.Choice(ListCommand.TARGET_OBJECTS))
 @click.option('-o', '--option', multiple=True)
 @click.pass_obj
-def list(context, object, option):
+def ckanta_list(context, object, option):
     # option -> List; item format: key=value
     option_dict = dict(map(
         lambda opt: (x.strip() for x in opt.split('=')),

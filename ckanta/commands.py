@@ -1,6 +1,5 @@
 import csv
 import logging
-import itertools
 from slugify import slugify
 from collections import OrderedDict, namedtuple
 from .common import CKANTAError
@@ -157,24 +156,6 @@ class UploadCommand(CommandBase):
     NATIONAL_KEY = 'national:'
     TARGET_OBJECTS = ('dataset',)
 
-    @property
-    def national_states(self):
-        key = '__national_states'
-        if not hasattr(self, key):
-            states = OrderedDict()
-            State = namedtuple('State', ['code', 'name'])
-
-            value = self.context.get_config('national-states')
-            for entry in itertools.chain(*[
-                ln.split('  ') for ln in value.split('\n') if ln
-            ]):
-                code, name = entry.strip().split(':')
-                name = name.replace("'", '').strip()
-                states[slugify(name)] = State(code, name)
-
-            setattr(self, key, states)
-        return getattr(self, key)
-
     def _validate_action_args(self, args):
         '''Validates that action args provided on the cli are valid.
 
@@ -206,7 +187,7 @@ class UploadCommand(CommandBase):
         if not orgname.startswith(self.NATIONAL_KEY):
             title = row_dict.pop('title')
             row_dict['title'] = '{} {}'.format(
-                self.national_states[orgname].name,
+                self.context.national_states[orgname].name,
                 title
             )
 
