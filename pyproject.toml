@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ckanta"
-version = "0.2.0"
+version = "0.3.0"
 description = "Command-line tool for automating CKAN portal management tasks"
 authors = ["Abdul-Hakeem Shaibu <hkmshb@gmail.com>"]
 license = "MIT"
