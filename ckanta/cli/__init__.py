@@ -183,7 +183,7 @@ def membership_list(context, userid, check_groups):
     result = {}
     try:
         cmd = MembershipCommand(context, userid, check_groups)
-        result = cmd.execute(as_get=context.as_get)
+        result = cmd.execute(as_get=False)
     except CommandError as ex:
         func = _log.error if not context.debug else _log.exception
         func('error: {}'.format(ex))

@@ -143,7 +143,7 @@ class MembershipCommand(CommandBase):
         targets = action_names[:1] if not self.check_group else action_names
         try:
             for action_name in targets:
-                title = action_name.split('_')[0]
+                # title = action_name.split('_')[0]
                 result = self.api_client(action_name, payload, as_get)
                 results.append(result)
         except Exception as ex:
