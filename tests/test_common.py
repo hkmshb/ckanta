@@ -1,6 +1,6 @@
 import pytest
 import os.path as fs
-from ckanta.common import get_config_instance, Config, ConfigError, ApiClient
+from ckanta.common import get_instance_config, Config, ConfigError, ApiClient
 
 
 HERE = fs.abspath(fs.dirname(__file__))
@@ -19,13 +19,13 @@ class TestConfig:
         assert cfg.name == 'name'
 
     def test_get_instance(self, cfg_s):
-        config = get_config_instance(cfg_s, 'local')
+        config = get_instance_config(cfg_s, 'local')
         assert config is not None
         assert isinstance(config, Config)
 
     def test_fails_for_unknown_instance_name(self, cfg_s):
         with pytest.raises(ConfigError):
-            get_config_instance(cfg_s, 'x-local')
+            get_instance_config(cfg_s, 'x-local')
 
 
 class TestApiClient:
