@@ -38,6 +38,18 @@ def read_config(fpath):
     return configp
 
 
+def get_config(configp, name, section_name=None):
+    '''Returns the configuration for the specified name
+    '''
+    section_name = section_name or 'ckanta'
+    if section_name not in configp.sections():
+        errmsg = 'Config section not found: {}'
+        raise ConfigError(errmsg.format(section_name))
+
+    section = configp[section_name]
+    return section.get(name, None)
+
+
 def get_config_instance(configp, name='local'):
     '''Returns the configuration for the named instance.
     '''
@@ -51,6 +63,11 @@ def get_config_instance(configp, name='local'):
         lambda k: section.get(k), ('urlbase', 'apikey')
     ))
     return Config(*values)
+
+
+def log_error(ex, context, logger):
+    func = logger.error if not context.debug else logger.exception
+    func('error: {}'.format(ex))
 
 
 class ApiClient:
