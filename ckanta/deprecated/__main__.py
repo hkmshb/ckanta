@@ -1,4 +1,4 @@
-from ckanta import Automator
+from ckanta.deprecated import Automator
 
 
 def main():

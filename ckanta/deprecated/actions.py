@@ -9,7 +9,7 @@ from urllib.parse import urljoin
 from functools import update_wrapper
 
 import click
-from ckanta import CommandBase
+from ckanta.deprecated import CommandBase
 
 
 DEFAULT_PAGE_SIZE = 5
