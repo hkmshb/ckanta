@@ -3,7 +3,7 @@ import click
 import logging
 from slugify import slugify
 from collections import OrderedDict, namedtuple
-from .common import CKANTAError, MembershipRole
+from .common import CKANTAError, CKANObject, MembershipRole
 
 
 _log = logging.getLogger()
@@ -16,6 +16,7 @@ class CommandError(CKANTAError):
 
 
 class CommandBase:
+    TARGET_OBJECTS = []
 
     def __init__(self, context, **action_args):
         self._validate_action_args(action_args)
@@ -154,12 +155,12 @@ class MembershipCommand(CommandBase):
 class MembershipGrantCommand(CommandBase):
     TARGET_OBJECTS = ('user',)
 
-    def __init__(self, context, userid, role, objects, is_org):
+    def __init__(self, context, userid, role, objects, object_type):
         super().__init__(context, object='user')
         self.role = MembershipRole.from_name(role)
+        self.object_type = object_type
         self.objects = objects
         self.userid = userid
-        self.is_org = is_org
 
     def _create_membership(self, group):
         if self.role == MembershipRole.NONE:
@@ -168,12 +169,13 @@ class MembershipGrantCommand(CommandBase):
             return
 
         role_name = self.role.name.lower()
-        target_object = 'organization' if self.is_org else 'group'
-        action_name = '{}_member_create'.format(target_object)
-        payload = {
-            'id': group, 'username': self.userid, 
-            'role': role_name
-        }
+        target_object = self.object_type.name.lower()
+        if self.object_type in (CKANObject.GROUP, CKANObject.ORGANIZATION):
+            action_name = '{}_member_create'.format(target_object)
+            payload = {
+                'id': group, 'username': self.userid, 
+                'role': role_name
+            }
         self.api_client(action_name, data=payload, as_get=False)
 
     def execute(self, as_get):

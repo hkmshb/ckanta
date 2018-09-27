@@ -7,7 +7,7 @@ import logging
 from pprint import pprint
 from ckanta.common import read_config, get_instance_config, \
      get_config, log_error, ConfigError, ApiClient, Config, \
-     CKANTAContext, MembershipRole
+     CKANTAContext, CKANObject, MembershipRole
 from ckanta.commands import CommandError, ListCommand, ShowCommand, \
      MembershipCommand, MembershipGrantCommand, UploadCommand
 
@@ -200,14 +200,17 @@ def membership_list(context, userid, check_groups):
 def membership_grant(context, userid, role, groups, orgs):
     '''Grants user access priviledge on a group, organization or dataset.
     '''
-    for (objects, is_org) in ((groups, False), (orgs, True)):
+    for (objects, obj_type) in (
+        (groups, CKANObject.GROUP), 
+        (orgs, CKANObject.ORGANIZATION)
+    ):
         if not objects:
             continue
 
         click.echo('Processing user membership for {}(s)...'.format(
-            'organization' if is_org else 'group'))
+            obj_type.name.lower()))
 
-        cmd = MembershipGrantCommand(context, userid, role, objects, is_org)
+        cmd = MembershipGrantCommand(context, userid, role, objects, obj_type)
         result = cmd.execute(as_get=False)
         pprint(result)
 

@@ -62,3 +62,10 @@ class TestMembershipRole:
     def test_creating_role_from_invalid_name_fails(self):
         with pytest.raises(ValueError):
             MembershipRole.from_name('bad-name')
+
+    def test_name_exclusions(self):
+        exclude_list = (MembershipRole.NONE, MembershipRole.ADMIN)
+        names = MembershipRole.names(exclude_list)
+        assert names and len(names) == 2
+        assert MembershipRole.ADMIN.name.lower() not in names
+        assert MembershipRole.NONE.name.lower() not in names

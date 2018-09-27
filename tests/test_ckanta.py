@@ -1,18 +1,10 @@
-from ckanta import __version__
-from ckanta import ActionDef
+from ckanta import get_version
+
 
 
 def test_version():
-    assert __version__ == '0.1.0'
+    value = get_version()
+    assert value not in ('', None)
 
-
-def test_actiondef():
-    action = ActionDef('action')
-    assert action is not None
-    assert action.table_def is None
-
-
-def test_actiondef_with_title():
-    action = ActionDef('action', 'title')
-    assert action is not None
-    assert action.table_def is not None
+    parts = list(map(lambda p: int(p), value.split('.')))
+    assert parts is not None and len(parts) == 3

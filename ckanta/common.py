@@ -29,15 +29,11 @@ class Config(namedtuple('Config', ['urlbase', 'apikey', 'name'])):
         return super().__new__(cls, urlbase, apikey, name)
 
 
-class MembershipRole(enum.Enum):
-    NONE = 0
-    MEMBER = 1
-    EDITOR = 2
-    ADMIN = 3
-
+class EnumMixin:
     @classmethod
-    def names(cls):
-        return [n.name.lower() for n in cls]
+    def names(cls, exclude_list=None):
+        exclude_list = exclude_list or []
+        return [n.name.lower() for n in cls if n not in exclude_list]
 
     @classmethod
     def from_name(cls, name):
@@ -45,6 +41,20 @@ class MembershipRole(enum.Enum):
             return cls[name.strip().upper()]
         except (KeyError, ValueError) as ex:
             raise ValueError from ex
+
+
+class MembershipRole(EnumMixin, enum.Enum):
+    NONE = 0
+    MEMBER = 1
+    EDITOR = 2
+    ADMIN = 3
+
+
+class CKANObject(EnumMixin, enum.Enum):
+    USER = 1
+    GROUP = 2
+    ORGANIZATION = 3
+    DATASET = 4
 
 
 def read_config(fpath):
