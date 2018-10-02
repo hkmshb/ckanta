@@ -18,6 +18,6 @@ pytest = "^3.6"
 pytest-cov = "^2.5"
 
 [tool.poetry.scripts]
-ckanta = "ckanta.__main__:main"
-ckanta-cli = "ckanta.cli:ckanta"
-ckanta-ext = "ckanta.actions:ckanta"
+ckanta = "ckanta.cli:ckanta"
+ckanta-old = "ckanta.deprecated.__main__:main"
+ckanta-old-ext = "ckanta.deprecated.actions:ckanta"
