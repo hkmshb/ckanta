@@ -194,12 +194,20 @@ def membership_list(context, userid, check_groups):
 @membership.command('grant')
 @click.argument('userid', type=str)
 @click.argument('role', type=click.Choice(MembershipRole.names()))
+@click.option('-d', '--dataset', 'datasets', multiple=True)
 @click.option('-g', '--group', 'groups', multiple=True)
 @click.option('-o', '--org', 'orgs', multiple=True)
 @click.pass_obj
-def membership_grant(context, userid, role, groups, orgs):
+def membership_grant(context, userid, role, datasets, groups, orgs):
     '''Grants user access priviledge on a group, organization or dataset.
     '''
+    if datasets:
+        click.echo('Processing user access grant for dataset(s)...')
+        obj_type = CKANObject.DATASET
+        cmd = MembershipGrantCommand(context, userid, role, datasets, obj_type)
+        result = cmd.execute(as_get=False)
+        pprint(result)
+
     for (objects, obj_type) in (
         (groups, CKANObject.GROUP), 
         (orgs, CKANObject.ORGANIZATION)

@@ -3,7 +3,7 @@ import click
 import logging
 from slugify import slugify
 from collections import OrderedDict, namedtuple
-from .common import CKANTAError, CKANObject, MembershipRole
+from .common import CKANTAError, CKANObject, MembershipRole, ApiClient
 
 
 _log = logging.getLogger()
@@ -162,7 +162,22 @@ class MembershipGrantCommand(CommandBase):
         self.objects = objects
         self.userid = userid
 
-    def _create_membership(self, group):
+    def _get_access_request_payload(self, object_id, user_dict):
+        return {
+            'fullname': '{} (via CKANTA)'.format(user_dict['display_name']),
+            'email': user_dict['email'],
+            'contact_phone_number': '000-0000-0000'.replace('-', ''),
+            'entity_id': object_id,
+            'entity_type': 'dataset',
+            'description': (
+                'Access request initiated from CKAN task automation tool '
+                'for official purpose.'),
+            'org_name': user_dict['org_name'],
+            'org_category': user_dict['org_category'],
+            'country_state': user_dict['country_state']
+        }
+
+    def _create_membership(self, object_id):
         if self.role == MembershipRole.NONE:
             click.echo('Skipping operation as dropping membership (role=none) '
                        'is not supported yet')
@@ -170,31 +185,80 @@ class MembershipGrantCommand(CommandBase):
 
         role_name = self.role.name.lower()
         target_object = self.object_type.name.lower()
-        if self.object_type in (CKANObject.GROUP, CKANObject.ORGANIZATION):
-            action_name = '{}_member_create'.format(target_object)
-            payload = {
-                'id': group, 'username': self.userid, 
-                'role': role_name
-            }
+        action_name = '{}_member_create'.format(target_object)
+        payload = {
+            'id': object_id, 'username': self.userid, 
+            'role': role_name
+        }
         self.api_client(action_name, data=payload, as_get=False)
 
-    def execute(self, as_get):
+    def _grant_dataset_access(self):
         passed, action_result = (0, [])
-        for obj in self.objects:
+        total = len(self.objects)
+        result = {}
+
+        # 1: first retrieve apikey for user to be granted access
+        _log.info('Retrieving details for user requiring access...')
+        try:
+            action_name = 'user_show'
+            result = self.api_client(action_name, {'id': self.userid}, False)
+            result = result['result']
+            _log.info('Requesting user details retrieved')
+        except Exception as ex:
+            _log.info('Failed retrieving details for user needing access')
+            return self._build_result_summary(action_result, total, passed)
+
+        # 2: make access request using retrieved user details
+        fullname = result['display_name']
+        _log.info("Making access request as '{}'".format(fullname))
+        for objectid in self.objects:
             try:
-                self._create_membership(obj)
-                action_result.append('+ {}'.format(obj))
+                # make request as user whom needs access
+                action_name = 'eoc_request_create'
+                payload = self._get_access_request_payload(objectid, result)
+                client = ApiClient(self.api_client.urlbase, result['apikey'])
+                result = client(action_name, payload, False)
+                request_id = result['result']['id']
+                _log.info('Access request made for {}. Got: {}'.format(
+                    objectid, request_id))
+
+                # patch request as user running script
+                action_name = 'eoc_request_patch'
+                payload = {'id': request_id, 'status': 'approved'}
+                result = self.api_client(action_name, payload, False)
+                _log.info('Access request granted\n')
+
                 passed += 1
             except Exception as ex:
-                action_result.append('. {}: err: {}'.format(obj, ex))
-        
-        total = len(self.objects)
+                action_result.append('. {}: err: {}'.format(objectid, ex))
+
+        result = self._build_result_summary(action_result, total, passed)
+        return result
+
+    def _build_result_summary(self, action_result, total, passed):
         return {
             'result': action_result,
             'summary': {
                 'total': total, 'passed': passed, 'failed': total - passed
             }
         }
+
+    def execute(self, as_get):
+        if self.object_type == CKANObject.DATASET:
+            result = self._grant_dataset_access()
+        elif self.object_type in (CKANObject.GROUP, CKANObject.ORGANIZATION):
+            passed, action_result = (0, [])
+            for obj in self.objects:
+                try:
+                    self._create_membership(obj)
+                    action_result.append('+ {}'.format(obj))
+                    passed += 1
+                except Exception as ex:
+                    action_result.append('. {}: err: {}'.format(obj, ex))
+            
+            total = len(self.objects)
+            result = self._build_result_summary(action_result, total, passed)
+        return result
 
 
 class UploadCommand(CommandBase):
