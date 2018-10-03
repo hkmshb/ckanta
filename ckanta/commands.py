@@ -265,7 +265,7 @@ class UploadCommand(CommandBase):
     '''Creates an object on a CKAN instance.
     '''
     NATIONAL_KEY = 'national:'
-    TARGET_OBJECTS = ('dataset',)
+    TARGET_OBJECTS = ('dataset', 'group')
 
     def _validate_action_args(self, args):
         '''Validates that action args provided on the cli are valid.
@@ -310,6 +310,16 @@ class UploadCommand(CommandBase):
         # use sector_id to define sector
         sector_id = row_dict.get('sector_id', '')
         row_dict['groups'] = [{'name': sector_id}]
+        return row_dict
+
+    def _get_group_payload_factory(self, payload_method, file_obj):
+        reader = csv.DictReader(file_obj, delimiter=',')
+        for row in reader:
+            yield payload_method(row)
+
+    def _build_group_payload(self, row_dict):
+        row_dict.setdefault('state', 'active')
+        row_dict.setdefault('name', slugify(row_dict.get('title')))
         return row_dict
 
     def execute(self, as_get=True):
