@@ -265,7 +265,7 @@ class UploadCommand(CommandBase):
     '''Creates an object on a CKAN instance.
     '''
     NATIONAL_KEY = 'national:'
-    TARGET_OBJECTS = ('dataset', 'group')
+    TARGET_OBJECTS = ('dataset', 'group', 'organization')
 
     def _validate_action_args(self, args):
         '''Validates that action args provided on the cli are valid.
@@ -320,6 +320,31 @@ class UploadCommand(CommandBase):
     def _build_group_payload(self, row_dict):
         row_dict.setdefault('state', 'active')
         row_dict.setdefault('name', slugify(row_dict.get('title')))
+        return row_dict
+
+    def _get_organization_payload_factory(self, payload_method, file_obj):
+        reader = csv.DictReader(file_obj, delimiter=',')
+        extras = list(filter(lambda k: k.startswith('extras:'), reader.fieldnames))
+        for row in reader:
+            yield payload_method(row, extras)
+
+    def _build_organization_payload(self, row_dict, extras=None):
+        row_dict.setdefault('state', 'active')
+        row_dict.setdefault('name', slugify(row_dict.get('title')))
+
+        # handle extras
+        extras_list = []
+        for entry in (extras or []):
+            _, field = [e for e in entry.split(':') if e][:2]
+            value = row_dict.pop(entry)
+            if value:
+                extras_list.append({
+                    'key': field, 
+                    'value': value
+                })
+
+        if extras_list:
+            row_dict['extras'] = extras_list
         return row_dict
 
     def execute(self, as_get=True):
