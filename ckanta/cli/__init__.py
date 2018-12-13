@@ -9,7 +9,8 @@ from ckanta.common import read_config, get_instance_config, \
      get_config, log_error, ConfigError, ApiClient, Config, \
      CKANTAContext, CKANObject, MembershipRole
 from ckanta.commands import CommandError, ListCommand, ShowCommand, \
-     MembershipCommand, MembershipGrantCommand, UploadCommand
+     MembershipCommand, MembershipGrantCommand, UploadCommand, \
+     PurgeCommand
 
 
 _log = logging.getLogger(__name__)
@@ -235,6 +236,22 @@ def upload(context, object, infile, owner_orgs):
     try:
         kwargs = {'object': object, 'infile': infile, 'owner_orgs': owner_orgs}
         cmd = UploadCommand(context, **kwargs)
+        result = cmd.execute(as_get=False)
+        pprint(result)
+    except CommandError as ex:
+        log_error(ex, context, _log)
+
+
+@ckanta.command()
+@click.argument('object', type=click.Choice(PurgeCommand.TARGET_OBJECTS))
+@click.option('--id', 'ids', multiple=True)
+@click.pass_obj
+def purge(context, object, ids):
+    '''Purge objects on a CKAN instance.
+    '''
+    try:
+        kwargs = {'object': object, 'ids': ids}
+        cmd = PurgeCommand(context, **kwargs)
         result = cmd.execute(as_get=False)
         pprint(result)
     except CommandError as ex:

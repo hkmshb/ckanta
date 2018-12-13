@@ -1,6 +1,7 @@
 import csv
 import click
 import logging
+from itertools import chain
 from slugify import slugify
 from collections import OrderedDict, namedtuple
 from .common import CKANTAError, CKANObject, MembershipRole, ApiClient
@@ -389,3 +390,33 @@ class UploadCommand(CommandBase):
                 'failed': total_items - passed
             }
         }
+
+
+class PurgeCommand(CommandBase):
+    """Purge existing objects on a CKAN instance.
+    """
+    TARGET_OBJECTS = ('dataset', 'group')
+
+    def __init__(self, context, object, ids):
+        super().__init__(context, object=object)
+        self.ids = ids
+
+    def execute(self, as_get=False):
+        target_object = self.action_args.pop('object')
+        target_object = target_object.replace('package', 'dataset')
+        action_name = '{}_purge'.format(target_object)
+
+        ids_list = list(filter(
+            lambda id: id and id.strip() != "",
+            chain(*[id.split(',') for id in self.ids])
+        ))
+
+        result = []
+        for obj_id in ids_list:
+            try:
+                self.api_client(action_name, {'id': obj_id}, as_get=as_get)
+                result.append('+ {}'.format(obj_id))
+            except Exception as ex:
+                print(ex)
+                result.append('. {}'.format(obj_id))
+        return result
