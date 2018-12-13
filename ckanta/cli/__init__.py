@@ -227,6 +227,7 @@ def membership_grant(context, userid, role, datasets, groups, orgs):
 @click.argument('object', type=click.Choice(UploadCommand.TARGET_OBJECTS))
 @click.argument('infile', type=click.File('r'))
 @click.option('--org', 'owner_orgs', multiple=True)
+@click.confirmation_option(help="Have you reviewed parameters and want to proceed?")
 @click.pass_obj
 def upload(context, object, infile, owner_orgs):
     '''Create objects (dataset) on a CKAN instance.
