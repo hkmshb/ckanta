@@ -26,7 +26,7 @@ def _configure_logger_dev():
 @click.group()
 @click.option('-u', '--urlbase')
 @click.option('-k', '--apikey')
-@click.option('-i', '--instance', default='local')
+@click.option('-i', '--instance', default='grid-local')
 @click.option('-p', '--post', default=False, is_flag=True)
 @click.option('-d', '--debug', default=False, is_flag=True)
 @click.pass_context
@@ -227,19 +227,27 @@ def membership_grant(context, userid, role, datasets, groups, orgs):
 @ckanta.command()
 @click.argument('object', type=click.Choice(UploadCommand.TARGET_OBJECTS))
 @click.argument('infile', type=click.File('r'))
-@click.option('--org', 'owner_orgs', multiple=True)
 @click.confirmation_option(help="Have you reviewed parameters and want to proceed?")
 @click.pass_obj
-def upload(context, object, infile, owner_orgs):
+def upload(context, object, infile):
     '''Create objects (dataset) on a CKAN instance.
     '''
     try:
-        kwargs = {'object': object, 'infile': infile, 'owner_orgs': owner_orgs}
+        kwargs = {'object': object, 'infile': infile}
         cmd = UploadCommand(context, **kwargs)
         result = cmd.execute(as_get=False)
         pprint(result)
     except CommandError as ex:
         log_error(ex, context, _log)
+
+
+@ckanta.command('upload-dataset')
+@click.argument('infile', type=click.File('r'))
+@click.option('--org', 'owner_orgs', multiple=True)
+@click.confirmation_option(help="Have you reviewed parameters and want to proceed?")
+@click.pass_obj
+def upload_dataset(context, infile, owner_orgs):
+    pass
 
 
 @ckanta.command()

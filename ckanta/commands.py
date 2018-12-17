@@ -266,7 +266,7 @@ class UploadCommand(CommandBase):
     '''Creates an object on a CKAN instance.
     '''
     NATIONAL_KEY = 'national:'
-    TARGET_OBJECTS = ('dataset', 'group', 'organization')
+    TARGET_OBJECTS = ('group', 'organization')
 
     def _validate_action_args(self, args):
         '''Validates that action args provided on the cli are valid.
@@ -280,38 +280,6 @@ class UploadCommand(CommandBase):
         # check that file argument is provided
         file_arg = args.get('infile', None)
         assert file_arg is not None, "'infile' argument expected"
-
-    def _get_package_payload_factory(self, payload_method, file_obj):
-        reader = csv.DictReader(file_obj, delimiter=',')
-        owner_orgs = self.action_args.pop('owner_orgs', [])
-
-        norm = lambda n: n.replace(self.NATIONAL_KEY, '')
-        for row in reader:
-            for orgname in owner_orgs:
-                row.setdefault('owner_org', norm(orgname))
-                row.setdefault('locations', norm(orgname))
-                yield payload_method(row, orgname)
-
-    def _build_package_payload(self, row_dict, orgname):
-        # required: name, private, state:active, type:dataset, owner_org,
-        #           sector_id, locations
-        # adjust title
-        if not orgname.startswith(self.NATIONAL_KEY):
-            title = row_dict.pop('title')
-            row_dict['title'] = '{} {}'.format(
-                self.context.national_states[orgname].name,
-                title
-            )
-
-        row_dict.setdefault('type', 'dataset')
-        row_dict.setdefault('state', 'active')
-        row_dict.setdefault('private', 'false')
-        row_dict.setdefault('name', slugify(row_dict.get('title')))
-
-        # use sector_id to define sector
-        sector_id = row_dict.get('sector_id', '')
-        row_dict['groups'] = [{'name': sector_id}]
-        return row_dict
 
     def _get_group_payload_factory(self, payload_method, file_obj):
         reader = csv.DictReader(file_obj, delimiter=',')
@@ -346,6 +314,102 @@ class UploadCommand(CommandBase):
 
         if extras_list:
             row_dict['extras'] = extras_list
+        return row_dict
+
+    def execute(self, as_get=True):
+        file_obj = self.action_args.pop('infile')
+        target_object = self.action_args.pop('object')
+        action_name = '{}_create'.format(target_object)
+
+        method_name = '_build_{}_payload'.format(target_object)
+        if not hasattr(self, method_name):
+            errmsg = 'Payload builder method not found: {}'
+            raise CommandError(errmsg.format(method_name))
+
+        payload_method = getattr(self, method_name)
+
+        method_name = '_get_{}_payload_factory'.format(target_object)
+        if not hasattr(self, method_name):
+            errmsg = 'Payload factory method not found: {}'
+            raise CommandError(errmsg.format(method_name))
+
+        factory_method = getattr(self, method_name)
+        _log.debug('action: {}, payload-method: {}, payload-factory: {}'.format(
+            action_name, payload_method.__name__, factory_method.__name__)
+        )
+
+        factory = factory_method(payload_method, file_obj)
+        passed, action_result = (0, [])
+        for payload in factory:
+            _log.debug('{} payload: {}'.format(target_object, payload))
+            try:
+                self.api_client(action_name, payload, as_get=False)
+                action_result.append('+ {}'.format(payload.get('name', '?')))
+                passed += 1
+            except Exception as ex:
+                _log.error('API request failed. {}'.format(ex))
+                action_result.append('x {}'.format(payload.get('name', '?')))
+
+        total_items = len(action_result)
+        return {
+            'result': action_result, 
+            'summary': {
+                'total': total_items, 'passed': passed,
+                'failed': total_items - passed
+            }
+        }
+
+
+class UploadDatasetCommand(CommandBase):
+    '''Create datasets on a CKAN instance.
+    '''
+    NATIONAL_KEY = 'national:'
+
+    def _validate_action_args(self, args):
+        '''Validates that action args provided on the cli are valid.
+
+        Expects a file argument to be provided in addition to the object
+        argument.
+        '''
+        # checks that object argument is provide
+        super()._validate_action_args(args)
+
+        # check that file argument is provided
+        file_arg = args.get('infile', None)
+        assert file_arg is not None, "'infile' argument expected"
+
+    def _get_package_payload_factory(self, payload_method, file_obj):
+        reader = csv.DictReader(file_obj, delimiter=',')
+        owner_orgs = self.action_args.pop('owner_orgs', [])
+        if not owner_orgs:
+            raise CKANTAError('owner_orgs not specified')
+
+        norm = lambda n: n.replace(self.NATIONAL_KEY, '')
+        for row in reader:
+            for orgname in owner_orgs:
+                row.setdefault('owner_org', norm(orgname))
+                row.setdefault('locations', norm(orgname))
+                yield payload_method(row, orgname)
+
+    def _build_package_payload(self, row_dict, orgname):
+        # required: name, private, state:active, type:dataset, owner_org,
+        #           sector_id, locations
+        # adjust title
+        if not orgname.startswith(self.NATIONAL_KEY):
+            title = row_dict.pop('title')
+            row_dict['title'] = '{} {}'.format(
+                self.context.national_states[orgname].name,
+                title
+            )
+
+        row_dict.setdefault('type', 'dataset')
+        row_dict.setdefault('state', 'active')
+        row_dict.setdefault('private', 'false')
+        row_dict.setdefault('name', slugify(row_dict.get('title')))
+
+        # use sector_id to define sector
+        sector_id = row_dict.get('sector_id', '')
+        row_dict['groups'] = [{'name': sector_id}]
         return row_dict
 
     def execute(self, as_get=True):
