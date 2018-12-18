@@ -10,7 +10,7 @@ from ckanta.common import read_config, get_instance_config, \
      CKANTAContext, CKANObject, MembershipRole
 from ckanta.commands import CommandError, ListCommand, ShowCommand, \
      MembershipCommand, MembershipGrantCommand, UploadCommand, \
-     PurgeCommand
+     UploadDatasetCommand, PurgeCommand
 
 
 _log = logging.getLogger(__name__)
@@ -243,11 +243,22 @@ def upload(context, object, infile):
 
 @ckanta.command('upload-dataset')
 @click.argument('infile', type=click.File('r'))
-@click.option('--org', 'owner_orgs', multiple=True)
+@click.argument('owner_orgs', type=click.STRING)
+@click.option('-u', '--urlbase', type=click.STRING, default=None)
+@click.option('-a', '--authkey', type=click.STRING, default=None)
+@click.option('-f', '--format', 
+              type=click.Choice(UploadDatasetCommand.TARGET_FORMATS.keys()))
 @click.confirmation_option(help="Have you reviewed parameters and want to proceed?")
 @click.pass_obj
-def upload_dataset(context, infile, owner_orgs):
-    pass
+def upload_dataset(context, infile, owner_orgs, urlbase, authkey, format):
+    try:
+        cmd = UploadDatasetCommand(
+            context, infile, owner_orgs, urlbase, authkey, format
+        )
+        result = cmd.execute(as_get=False)
+        pprint(result)
+    except CommandError as ex:
+        log_error(ex, context, _log)
 
 
 @ckanta.command()

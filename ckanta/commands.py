@@ -1,7 +1,11 @@
+import re
 import csv
 import click
 import logging
 from itertools import chain
+from urllib.parse import unquote
+
+from furl import furl
 from slugify import slugify
 from collections import OrderedDict, namedtuple
 from .common import CKANTAError, CKANObject, MembershipRole, ApiClient
@@ -363,37 +367,42 @@ class UploadCommand(CommandBase):
 class UploadDatasetCommand(CommandBase):
     '''Create datasets on a CKAN instance.
     '''
+    VARTAG_STATE = '${state_code}'
+    REPTTN_STATE = re.compile("state(?:code|_code)='(.+)'")
     NATIONAL_KEY = 'national:'
+    TARGET_OBJECTS = ('dataset',)
+    TARGET_FORMATS = {
+        'CSV': 'csv',
+        'JSON': 'application/json',
+        'GeoJSON': 'application/json',
+    }
 
-    def _validate_action_args(self, args):
-        '''Validates that action args provided on the cli are valid.
+    def __init__(self, context, infile, owner_orgs, urlbase, authkey, format):
+        super().__init__(context, object=self.TARGET_OBJECTS[0])
+        self.infile = infile
+        self.urlbase = urlbase
+        self.authkey = authkey
+        self.format = format
 
-        Expects a file argument to be provided in addition to the object
-        argument.
-        '''
-        # checks that object argument is provide
-        super()._validate_action_args(args)
-
-        # check that file argument is provided
-        file_arg = args.get('infile', None)
-        assert file_arg is not None, "'infile' argument expected"
+        if not isinstance(owner_orgs, (list, tuple)):
+            owner_orgs = owner_orgs.split(',')
+        self.owner_orgs = owner_orgs
 
     def _get_package_payload_factory(self, payload_method, file_obj):
         reader = csv.DictReader(file_obj, delimiter=',')
-        owner_orgs = self.action_args.pop('owner_orgs', [])
-        if not owner_orgs:
-            raise CKANTAError('owner_orgs not specified')
 
         norm = lambda n: n.replace(self.NATIONAL_KEY, '')
         for row in reader:
-            for orgname in owner_orgs:
+            for orgname in self.owner_orgs:
                 row.setdefault('owner_org', norm(orgname))
                 row.setdefault('locations', norm(orgname))
                 yield payload_method(row, orgname)
 
     def _build_package_payload(self, row_dict, orgname):
-        # required: name, private, state:active, type:dataset, owner_org,
-        #           sector_id, locations
+        ## required package attributes:
+        #   name, private, state:active, type:dataset, owner_org,
+        #   sector_id, locations
+
         # adjust title
         if not orgname.startswith(self.NATIONAL_KEY):
             title = row_dict.pop('title')
@@ -410,10 +419,96 @@ class UploadDatasetCommand(CommandBase):
         # use sector_id to define sector
         sector_id = row_dict.get('sector_id', '')
         row_dict['groups'] = [{'name': sector_id}]
+
+        ## build resource
+        res_dict = self._build_resource_payload(row_dict, orgname)
+        if res_dict:
+            row_dict['resources'] = [res_dict]
+
         return row_dict
 
+    def _build_resource_payload(self, row_dict, orgname):
+        ## required resource attributes
+        #     res:name, res:url, 
+        ## optinal resource attributes
+        #     res:description
+        res_dict = {
+            k[4:]: row_dict[k]
+            for k in row_dict.keys()
+            if k.startswith('res:') and k[4:] and row_dict[k]
+        }
+        if not res_dict or 'url' not in res_dict:
+            return
+
+        # if name not provided use package title
+        org_fullname = self.context.national_states[orgname].name
+        pkg_title = row_dict.get('title')
+        if org_fullname in pkg_title:
+            pkg_title = pkg_title.replace(org_fullname, '').strip()
+        res_dict.setdefault('name', pkg_title)
+
+        # process url further
+        built_url = self._build_resource_url(res_dict['url'], orgname)
+        res_dict['url'] = built_url
+        return res_dict
+
+    def _build_resource_url(self, res_url, orgname):
+        built_url = None
+        if res_url.startswith('http'):
+            built_url = furl(unquote(res_url))
+        else:
+            config_name = 'grid-geoserver-urlbase'
+            urlbase = self.urlbase or self.context.get_config(config_name)
+            if not urlbase:
+                raise CKANTAError(
+                    "Please provide '-u/--urlbase' option or set "
+                    "'{0}' in the config file".format(config_name)
+                )
+            built_url = furl(urlbase)
+
+            # add in what we currently have as res_url
+            for (key, value) in zip(
+                ('typeName', 'CQL_FILTER'),
+                [p.strip() for p in res_url.split(';')]
+            ):
+                built_url.args[key] = value
+
+        # add in other stuff from config
+        for qryparam in (
+            'service', 'version', 'request', 'outputFormat', 'authkey'
+        ):
+            if qryparam not in built_url.args:
+                conf_key = 'grid-geoserver-{}'.format(qryparam)
+                value = self.context.get_config(conf_key)
+                if not value:
+                    raise CKANTAError(
+                        "Please set '{0}' in the config file".format(conf_key)
+                    )
+                built_url.args[qryparam] = value
+
+        # overwrite query params provide on the cli
+        for (param_key, param_value) in (
+            ('outputFormat', self.format), ('authkey', self.authkey)
+        ):
+            if param_value:
+                built_url.args[param_key] = param_value
+
+        # replace state_code in CQL_FILTER
+        cql_filter = built_url.args['CQL_FILTER']
+        state_code = self.context.national_states[orgname].code
+        if self.VARTAG_STATE in cql_filter:
+            cql_filter = cql_filter.replace(self.VARTAG_STATE, state_code)
+            built_url.args['CQL_FILTER'] = cql_filter
+        else:
+            match = self.REPTTN_STATE.search(cql_filter)
+            if match:
+                found = match.groups()[0]
+                cql_filter = cql_filter.replace(found, state_code)
+                built_url.args['CQL_FILTER'] = cql_filter
+        return built_url.url
+
     def execute(self, as_get=True):
-        file_obj = self.action_args.pop('infile')
+        file_obj = self.infile
         target_object = self.action_args.pop('object')
         action_name = '{}_create'.format(target_object)
 
@@ -438,6 +533,7 @@ class UploadDatasetCommand(CommandBase):
         passed, action_result = (0, [])
         for payload in factory:
             _log.debug('{} payload: {}'.format(target_object, payload))
+
             try:
                 self.api_client(action_name, payload, as_get=False)
                 action_result.append('+ {}'.format(payload.get('name', '?')))
@@ -481,6 +577,5 @@ class PurgeCommand(CommandBase):
                 self.api_client(action_name, {'id': obj_id}, as_get=as_get)
                 result.append('+ {}'.format(obj_id))
             except Exception as ex:
-                print(ex)
                 result.append('. {}'.format(obj_id))
         return result
