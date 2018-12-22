@@ -9,6 +9,9 @@ CKANTA can pick configuration and command settings from `~/.config/ckanta.conf` 
 settings for multiple CKAN instances and some other CKANTA-wide settings accessible
 from the context object using the `get_config` method.
 
+
+Sample `ckanta.conf` file:
+
 ```ini
 # instance setting
 [instance:<name-1>]
@@ -21,6 +24,7 @@ apikey={guid-2}
 
 # ckanta-wide settings accessible using `context.get_config`
 [ckanta]
+default-instance = <name-x>
 key=value
 key=value
 national-state = nigeria
@@ -29,3 +33,13 @@ national-states =
    BA:Bauchi  BE:Benue  BR:Borno  BY:Bayelsa
    CR:'Cross River' ...
 ```
+
+Sample CKANTA commands:
+
+```bash
+# command syntax; use ckanta --help for full help description
+$ ckanta [-u/--urlbase] [-k/--apikey] [-/--instance] command [command-options] 
+
+# listing CKAN objects from instance named as `grid-prod` within `ckanta.conf`
+$ ckanta -i grid-prod list (dataset|group|organization|user)
+```s
