@@ -263,13 +263,14 @@ def upload_dataset(context, infile, owner_orgs, urlbase, authkey, format):
 
 @ckanta.command()
 @click.argument('object', type=click.Choice(PurgeCommand.TARGET_OBJECTS))
+@click.option('--infile', type=click.File('r'))
 @click.option('--id', 'ids', multiple=True)
 @click.pass_obj
-def purge(context, object, ids):
+def purge(context, object, infile, ids):
     '''Purge objects on a CKAN instance.
     '''
     try:
-        kwargs = {'object': object, 'ids': ids}
+        kwargs = {'object': object, 'ids': ids, 'infile': infile}
         cmd = PurgeCommand(context, **kwargs)
         result = cmd.execute(as_get=False)
         pprint(result)

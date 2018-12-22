@@ -557,8 +557,9 @@ class PurgeCommand(CommandBase):
     """
     TARGET_OBJECTS = ('dataset', 'group')
 
-    def __init__(self, context, object, ids):
+    def __init__(self, context, object, infile, ids):
         super().__init__(context, object=object)
+        self.infile = infile
         self.ids = ids
 
     def execute(self, as_get=False):
@@ -570,6 +571,10 @@ class PurgeCommand(CommandBase):
             lambda id: id and id.strip() != "",
             chain(*[id.split(',') for id in self.ids])
         ))
+
+        if self.infile:
+            lines = self.infile.readlines()
+            ids_list.extend([ln.strip() for ln in lines])
 
         result = []
         for obj_id in ids_list:
