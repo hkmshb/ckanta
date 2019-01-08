@@ -2,16 +2,26 @@
 
 set -eux
 
-## create system admin
-if [ "$*" == "create-admin" ]; then
+show_help() {
+  echo """
+  Commands:
+    create-admin            : create admin user
+    upload-data             : upload data to instance
+  """
+}
+
+perform_action() {
+  ## create system admin
+  if [ "$*" == "create-admin" ]; then
     echo Creating SysAdmin User
     echo ======================
 
     cd ${wp}/grid-data-portal
     docker-compose exec ckan /opt/ckan/create_admin_user.sh
-fi
+  fi
 
-if  [ "$*" == "upload-data" ]; then
+  ## upload data to instance
+  if  [ "$*" == "upload-data" ]; then
     echo Uploading states and sectors data
     echo =================================
 
@@ -20,4 +30,14 @@ if  [ "$*" == "upload-data" ]; then
 
     ${py} -m ckanta.cli upload group ./_fixtures/grid-sectors.txt
     ${py} -m ckanta.cli upload organization ./_fixtures/grid-states.txt
-fi
+  fi
+}
+
+case "$*" in
+  help )
+    show_help
+  ;;
+  * )
+    perform_action $*
+  ;;
+esac
